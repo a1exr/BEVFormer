@@ -475,6 +475,6 @@ if __name__ == '__main__':
     cur_reluts_dir = 'test/bevformer_base/Tue_Jun_28_08_14_43_2022/pts_bbox'
     bevformer_results = mmcv.load(os.path.join(cur_reluts_dir, 'results_nusc.json'))
     sample_token_list = list(bevformer_results['results'].keys())
-    for id in range(0, 10):
+    for id in range(11, 50):
         save_path = os.path.join(cur_reluts_dir, 'plots', sample_token_list[id])
         render_sample_data(sample_token_list[id], pred_data=bevformer_results, out_path=save_path)
