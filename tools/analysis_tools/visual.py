@@ -10,6 +10,7 @@ from nuscenes.utils.geometry_utils import view_points, box_in_image, BoxVisibili
 from typing import Tuple, List, Iterable
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 from PIL import Image
 from matplotlib import rcParams
 from matplotlib.axes import Axes
@@ -314,7 +315,7 @@ def lidiar_render(sample_token, data,out_path=None):
     pred_annotations.add_boxes(sample_token, bbox_pred_list)
     print('green is ground truth')
     print('blue is the predited result')
-    visualize_sample(nusc, sample_token, gt_annotations, pred_annotations, savepath=out_path+'_bev')
+    visualize_sample(nusc, sample_token, gt_annotations, pred_annotations, savepath=out_path + '_bev')
 
 
 def get_color(category_name: str):
@@ -463,15 +464,17 @@ def render_sample_data(
         ax[j + 2, ind].set_aspect('equal')
 
     if out_path is not None:
-        plt.savefig(out_path+'_camera', bbox_inches='tight', pad_inches=0, dpi=200)
-    if verbose:
-        plt.show()
+        plt.savefig(out_path + '_camera', bbox_inches='tight', pad_inches=0, dpi=200)
+    # if verbose:
+    #     plt.show()
     plt.close()
 
 if __name__ == '__main__':
     nusc = NuScenes(version='v1.0-trainval', dataroot='./data/nuscenes/trainval', verbose=True)
     # render_annotation('7603b030b42a4b1caa8c443ccc1a7d52')
-    bevformer_results = mmcv.load('test/bevformer_base/Tue_Jun_28_08_14_43_2022/pts_bbox/results_nusc.json')
+    cur_reluts_dir = 'test/bevformer_base/Tue_Jun_28_08_14_43_2022/pts_bbox'
+    bevformer_results = mmcv.load(os.path.join(cur_reluts_dir, 'results_nusc.json'))
     sample_token_list = list(bevformer_results['results'].keys())
     for id in range(0, 10):
-        render_sample_data(sample_token_list[id], pred_data=bevformer_results, out_path=sample_token_list[id])
+        save_path = os.path.join(cur_reluts_dir, 'plots', sample_token_list[id])
+        render_sample_data(sample_token_list[id], pred_data=bevformer_results, out_path=save_path)
