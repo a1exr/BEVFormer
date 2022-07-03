@@ -494,7 +494,7 @@ def main():
 
     seed(args.seed)
     dt = datetime.now()
-    str_dt = dt.strftime("%d-%m-%Y_%H:%M:%S")
+    str_dt = dt.strftime("%d-%m-%Y_%H:%M:%S") + '_rand' if args.random else ''
     save_dir = os.path.join(cur_results_dir, 'plots', str_dt)
     os.makedirs(save_dir, exist_ok=True)
 
@@ -513,9 +513,5 @@ def main():
 
 
 if __name__ == '__main__':
-<<<<<<< HEAD
     nusc = NuScenes(version='v1.0-trainval', dataroot='./data/nuscenes/trainval', verbose=True)
-=======
->>>>>>> d66cdba24cd2a383f3c703098a4a07eb2c295edf
     main()
-
