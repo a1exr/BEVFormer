@@ -513,6 +513,9 @@ def main():
 
 
 if __name__ == '__main__':
+<<<<<<< HEAD
     nusc = NuScenes(version='v1.0-trainval', dataroot='./data/nuscenes/trainval', verbose=True)
+=======
+>>>>>>> d66cdba24cd2a383f3c703098a4a07eb2c295edf
     main()
 
