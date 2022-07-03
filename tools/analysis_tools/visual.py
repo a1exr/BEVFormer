@@ -4,6 +4,7 @@
 # ---------------------------------------------
 
 import mmcv
+import argparse
 from nuscenes.nuscenes import NuScenes
 from PIL import Image
 from nuscenes.utils.geometry_utils import view_points, box_in_image, BoxVisibility, transform_matrix
@@ -26,6 +27,8 @@ from nuscenes.eval.common.data_classes import EvalBoxes, EvalBox
 from nuscenes.eval.detection.data_classes import DetectionBox
 from nuscenes.eval.detection.utils import category_to_detection_name
 from nuscenes.eval.detection.render import visualize_sample
+from datetime import datetime
+from random import sample, seed
 
 
 
@@ -469,12 +472,46 @@ def render_sample_data(
     #     plt.show()
     plt.close()
 
-if __name__ == '__main__':
-    nusc = NuScenes(version='v1.0-trainval', dataroot='./data/nuscenes/trainval', verbose=True)
-    # render_annotation('7603b030b42a4b1caa8c443ccc1a7d52')
-    cur_reluts_dir = 'test/bevformer_base/Tue_Jun_28_08_14_43_2022/pts_bbox'
-    bevformer_results = mmcv.load(os.path.join(cur_reluts_dir, 'results_nusc.json'))
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Visualize BEV results')
+    parser.add_argument('--dataroot', type=str, default='./data/nuscenes/trainval')
+    parser.add_argument('--version', type=str, default='v1.0-trainval', choices=['v1.0-trainval', 'v1.0-mini'])
+    parser.add_argument('--results_dir', help='the dir where the results json is')
+    parser.add_argument('--samples', type=int, default=10, help='number of samples')
+    parser.add_argument('--random', action='store_true', help='pick samples randomly')
+    parser.add_argument('--seed', type=int, default=0, help='random seed')
+    args = parser.parse_args()
+
+    return args
+
+
+def main():
+    args = parse_args()
+
+    nusc = NuScenes(version=args.version, dataroot=args.dataroot, verbose=True)
+    cur_results_dir = args.results_dir
+
+    seed(args.seed)
+    dt = datetime.now()
+    str_dt = dt.strftime("%d-%m-%Y_%H:%M:%S")
+    save_dir = os.path.join(cur_results_dir, 'plots', str_dt)
+    os.makedirs(save_dir, exist_ok=True)
+
+    bevformer_results = mmcv.load(os.path.join(cur_results_dir, 'results_nusc.json'))
     sample_token_list = list(bevformer_results['results'].keys())
-    for id in range(11, 50):
-        save_path = os.path.join(cur_reluts_dir, 'plots', sample_token_list[id])
-        render_sample_data(sample_token_list[id], pred_data=bevformer_results, out_path=save_path)
+
+    if args.random:
+        random_sample_token_list = sample(sample_token_list, args.samples)
+        for sample_token in random_sample_token_list:
+            save_path = os.path.join(save_dir, sample_token)
+            render_sample_data(sample_token, pred_data=bevformer_results, out_path=save_path)
+    else:
+        for id in range(0, args.samples):
+            save_path = os.path.join(save_dir, sample_token_list[id])
+            render_sample_data(sample_token_list[id], pred_data=bevformer_results, out_path=save_path)
+
+
+if __name__ == '__main__':
+    main()
+
