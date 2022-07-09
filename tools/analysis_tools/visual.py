@@ -3,6 +3,7 @@
 #  Modified by Zhiqi Li
 # ---------------------------------------------
 
+from tkinter import image_names
 import mmcv
 import argparse
 from nuscenes.nuscenes import NuScenes
@@ -11,6 +12,7 @@ from nuscenes.utils.geometry_utils import view_points, box_in_image, BoxVisibili
 from typing import Tuple, List, Iterable
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import os
 from PIL import Image
 from matplotlib import rcParams
@@ -28,7 +30,7 @@ from nuscenes.eval.detection.data_classes import DetectionBox
 from nuscenes.eval.detection.utils import category_to_detection_name
 from nuscenes.eval.detection.render import visualize_sample
 from datetime import datetime
-from random import sample, seed
+from random import shuffle, seed
 
 
 
@@ -316,8 +318,8 @@ def lidiar_render(sample_token, data,out_path=None):
     pred_annotations = EvalBoxes()
     gt_annotations.add_boxes(sample_token, bbox_gt_list)
     pred_annotations.add_boxes(sample_token, bbox_pred_list)
-    print('green is ground truth')
-    print('blue is the predited result')
+    # print('green is ground truth')
+    # print('blue is the predited result')
     visualize_sample(nusc, sample_token, gt_annotations, pred_annotations, savepath=out_path + '_bev')
 
 
@@ -353,7 +355,7 @@ def get_color(category_name: str):
 
 
 def render_sample_data(
-        sample_toekn: str,
+        sample_token: str,
         with_anns: bool = True,
         box_vis_level: BoxVisibility = BoxVisibility.ANY,
         axes_limit: float = 40,
@@ -396,8 +398,7 @@ def render_sample_data(
         to False, the colors of the lidar data represent the distance from the center of the ego vehicle.
         If show_lidarseg is True, show_panoptic will be set to False.
     """
-    lidiar_render(sample_toekn, pred_data, out_path=out_path)
-    sample = nusc.get('sample', sample_toekn)
+    sample = nusc.get('sample', sample_token)
     # sample = data['results'][sample_token_list[0]][0]
     cams = [
         'CAM_FRONT_LEFT',
@@ -407,8 +408,9 @@ def render_sample_data(
         'CAM_BACK',
         'CAM_BACK_RIGHT',
     ]
+    image_name = None
     if ax is None:
-        _, ax = plt.subplots(4, 3, figsize=(24, 18))
+        _, ax = plt.subplots(6, 3, figsize=(24, 24), gridspec_kw={'height_ratios': [1, 6, 6, 1, 6, 6]})
     j = 0
     for ind, cam in enumerate(cams):
         sample_data_token = sample['data'][cam]
@@ -422,7 +424,7 @@ def render_sample_data(
             # Load boxes and image.
             boxes = [Box(record['translation'], record['size'], Quaternion(record['rotation']),
                          name=record['detection_name'], token='predicted') for record in
-                     pred_data['results'][sample_toekn] if record['detection_score'] > 0.2]
+                     pred_data['results'][sample_token] if record['detection_score'] > 0.2]
 
             data_path, boxes_pred, camera_intrinsic = get_predicted_data(sample_data_token,
                                                                          box_vis_level=box_vis_level, pred_anns=boxes)
@@ -434,43 +436,53 @@ def render_sample_data(
             # mmcv.imwrite(np.array(data)[:,:,::-1], f'{cam}.png')
             # Init axes.
 
+            if not image_name:
+                basename = os.path.basename(data_path)
+                split_name = basename.split('__')
+                image_name = split_name[0] + '_' + os.path.splitext(split_name[2])[0]
+
             # Show image.
-            ax[j, ind].imshow(data)
-            ax[j + 2, ind].imshow(data)
+            ax[j+1, ind].imshow(data)
+            ax[j+4, ind].imshow(data)
 
             # Show boxes.
             if with_anns:
                 for box in boxes_pred:
                     c = np.array(get_color(box.name)) / 255.0
-                    box.render(ax[j, ind], view=camera_intrinsic, normalize=True, colors=(c, c, c))
+                    box.render(ax[j+1, ind], view=camera_intrinsic, normalize=True, colors=(c, c, c))
                 for box in boxes_gt:
                     c = np.array(get_color(box.name)) / 255.0
-                    box.render(ax[j + 2, ind], view=camera_intrinsic, normalize=True, colors=(c, c, c))
+                    box.render(ax[j+4, ind], view=camera_intrinsic, normalize=True, colors=(c, c, c))
 
             # Limit visible range.
-            ax[j, ind].set_xlim(0, data.size[0])
-            ax[j, ind].set_ylim(data.size[1], 0)
-            ax[j + 2, ind].set_xlim(0, data.size[0])
-            ax[j + 2, ind].set_ylim(data.size[1], 0)
+            ax[j+1, ind].set_xlim(0, data.size[0])
+            ax[j+1, ind].set_ylim(data.size[1], 0)
+            ax[j+4, ind].set_xlim(0, data.size[0])
+            ax[j+4, ind].set_ylim(data.size[1], 0)
 
         else:
             raise ValueError("Error: Unknown sensor modality!")
 
         ax[j, ind].axis('off')
-        ax[j, ind].set_title('PRED: {} {labels_type}'.format(
-            sd_record['channel'], labels_type='(predictions)' if lidarseg_preds_bin_path else ''))
-        ax[j, ind].set_aspect('equal')
+        ax[j+3, ind].axis('off')
 
-        ax[j + 2, ind].axis('off')
-        ax[j + 2, ind].set_title('GT:{} {labels_type}'.format(
+        ax[j+1, ind].axis('off')
+        ax[j+1, ind].set_title('PRED: {} {labels_type}'.format(
             sd_record['channel'], labels_type='(predictions)' if lidarseg_preds_bin_path else ''))
-        ax[j + 2, ind].set_aspect('equal')
+        ax[j+1, ind].set_aspect('equal')
 
-    if out_path is not None:
-        plt.savefig(out_path + '_camera', bbox_inches='tight', pad_inches=0, dpi=200)
+        ax[j+4, ind].axis('off')
+        ax[j+4, ind].set_title('GT:{} {labels_type}'.format(
+            sd_record['channel'], labels_type='(predictions)' if lidarseg_preds_bin_path else ''))
+        ax[j+4, ind].set_aspect('equal')
+
+    out_path = os.path.join(out_path, image_name)
+    plt.savefig(out_path + '_camera', bbox_inches='tight', pad_inches=0, dpi=200)
     # if verbose:
     #     plt.show()
     plt.close()
+
+    lidiar_render(sample_token, pred_data, out_path=out_path)
 
 
 def parse_args():
@@ -478,7 +490,8 @@ def parse_args():
     parser.add_argument('--dataroot', type=str, default='./data/nuscenes/trainval')
     parser.add_argument('--version', type=str, default='v1.0-trainval', choices=['v1.0-trainval', 'v1.0-mini'])
     parser.add_argument('--results_dir', help='the dir where the results json is')
-    parser.add_argument('--samples', type=int, default=10, help='number of samples')
+    parser.add_argument('--amount', type=int, default=10, help='number of samples / scenes')
+    parser.add_argument('--scene_video', action='store_true', help='visualize entire scene')
     parser.add_argument('--random', action='store_true', help='pick samples randomly')
     parser.add_argument('--seed', type=int, default=0, help='random seed')
     args = parser.parse_args()
@@ -486,32 +499,44 @@ def parse_args():
     return args
 
 
-def main():
-    args = parse_args()
-
-    nusc = NuScenes(version=args.version, dataroot=args.dataroot, verbose=True)
-    cur_results_dir = args.results_dir
-
+def main(args, nusc):
     seed(args.seed)
     dt = datetime.now()
-    str_dt = dt.strftime("%d-%m-%Y_%H:%M:%S") + '_rand' if args.random else ''
-    save_dir = os.path.join(cur_results_dir, 'plots', str_dt)
+    extension = '_rand' if args.random else ''
+    str_dt = dt.strftime("%d-%m-%Y_%H:%M:%S") + extension
+    save_dir = os.path.join(args.results_dir, 'plots', str_dt)
     os.makedirs(save_dir, exist_ok=True)
 
-    bevformer_results = mmcv.load(os.path.join(cur_results_dir, 'results_nusc.json'))
+    bevformer_results = mmcv.load(os.path.join(args.results_dir, 'results_nusc.json'))
     sample_token_list = list(bevformer_results['results'].keys())
 
-    if args.random:
-        random_sample_token_list = sample(sample_token_list, args.samples)
-        for sample_token in random_sample_token_list:
-            save_path = os.path.join(save_dir, sample_token)
-            render_sample_data(sample_token, pred_data=bevformer_results, out_path=save_path)
+    if args.scene_video:
+        i = 0
+        scenes_list = [scene for scene in nusc.scene]
+        if args.random:
+            shuffle(scenes_list)
+        for scene in scenes_list:
+            first_sample_token = scene['first_sample_token']
+            last_sample_token = scene['last_sample_token']
+            if first_sample_token in sample_token_list:
+                st_index = sample_token_list.index(first_sample_token)
+                end_index = sample_token_list.index(last_sample_token)
+                i += 1
+
+                print('---Scene token ' + scene['token'])
+                for sample_token in sample_token_list[st_index:end_index+1]:
+                    render_sample_data(sample_token, pred_data=bevformer_results, out_path=save_dir)
+                if i == args.amount:
+                    break
+
     else:
-        for id in range(0, args.samples):
-            save_path = os.path.join(save_dir, sample_token_list[id])
-            render_sample_data(sample_token_list[id], pred_data=bevformer_results, out_path=save_path)
+        if args.random:
+            shuffle(sample_token_list)
+        for sample_token in sample_token_list[:args.amount]:
+            render_sample_data(sample_token, pred_data=bevformer_results, out_path=save_dir)
 
 
 if __name__ == '__main__':
-    nusc = NuScenes(version='v1.0-trainval', dataroot='./data/nuscenes/trainval', verbose=True)
-    main()
+    args = parse_args()
+    nusc = NuScenes(version=args.version, dataroot=args.dataroot, verbose=True)
+    main(args, nusc)
