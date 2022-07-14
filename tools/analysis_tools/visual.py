@@ -3,7 +3,7 @@
 #  Modified by Zhiqi Li
 # ---------------------------------------------
 
-from tkinter import image_names
+from tkinter import N, image_names
 import mmcv
 import argparse
 from nuscenes.nuscenes import NuScenes
@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import os
+import cv2
 from PIL import Image
 from matplotlib import rcParams
 from matplotlib.axes import Axes
@@ -32,9 +33,6 @@ from nuscenes.eval.detection.render import visualize_sample
 from datetime import datetime
 from random import shuffle, seed
 
-
-
-
 cams = ['CAM_FRONT',
  'CAM_FRONT_RIGHT',
  'CAM_BACK_RIGHT',
@@ -47,6 +45,27 @@ import matplotlib.pyplot as plt
 from nuscenes.utils.data_classes import LidarPointCloud, RadarPointCloud, Box
 from PIL import Image
 from matplotlib import rcParams
+
+
+def create_video(save_dir, scene_name):
+    output_dir = os.path.join(save_dir, 'videos')
+    os.makedirs(output_dir, exist_ok=True)
+    video_path = os.path.join(output_dir, f'{scene_name}.avi')
+    if os.path.isfile(video_path):
+        os.remove(video_path)
+
+    all_frames = sorted([os.path.join(save_dir, cur_img) for cur_img in os.listdir(save_dir) if scene_name in cur_img and cur_img.endswith('_bev.png')])
+    # all_frames.sort(key=lambda x: int(os.path.basename(x).split('_')[1].split('.')[0]))
+    fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
+
+    height, width, channels = cv2.imread(all_frames[0]).shape
+    out = cv2.VideoWriter(video_path, fourcc, 3, (width, height), True)
+
+    print('Creating Video Animation')
+    for filename in tqdm(all_frames):
+        img = cv2.imread(filename)
+        out.write(img)
+    out.release()
 
 
 def render_annotation(
@@ -149,7 +168,6 @@ def render_annotation(
         plt.savefig(out_path)
 
 
-
 def get_sample_data(sample_data_token: str,
                     box_vis_level: BoxVisibility = BoxVisibility.ANY,
                     selected_anntokens=None,
@@ -210,7 +228,6 @@ def get_sample_data(sample_data_token: str,
         box_list.append(box)
 
     return data_path, box_list, cam_intrinsic
-
 
 
 def get_predicted_data(sample_data_token: str,
@@ -276,9 +293,7 @@ def get_predicted_data(sample_data_token: str,
     return data_path, box_list, cam_intrinsic
 
 
-
-
-def lidiar_render(sample_token, data,out_path=None):
+def lidiar_render(sample_token, data, out_path=None, ax=None):
     bbox_gt_list = []
     bbox_pred_list = []
     anns = nusc.get('sample', sample_token)['anns']
@@ -320,7 +335,8 @@ def lidiar_render(sample_token, data,out_path=None):
     pred_annotations.add_boxes(sample_token, bbox_pred_list)
     # print('green is ground truth')
     # print('blue is the predited result')
-    visualize_sample(nusc, sample_token, gt_annotations, pred_annotations, savepath=out_path + '_bev')
+    # visualize_sample(nusc, sample_token, gt_annotations, pred_annotations, savepath=out_path + '_bev')
+    visualize_sample(nusc, sample_token, gt_annotations, pred_annotations, ax)
 
 
 def get_color(category_name: str):
@@ -408,10 +424,31 @@ def render_sample_data(
         'CAM_BACK',
         'CAM_BACK_RIGHT',
     ]
+    split_name = None
     image_name = None
-    if ax is None:
-        _, ax = plt.subplots(6, 3, figsize=(24, 24), gridspec_kw={'height_ratios': [1, 6, 6, 1, 6, 6]})
-    j = 0
+
+    fig = plt.figure()
+    fig.set_figheight(16)
+    fig.set_figwidth(40)
+    ax = 13 * [None]
+    
+    ax[0] = plt.subplot2grid(shape=(4, 12), loc=(0, 4), colspan=4, rowspan=4)
+    lidiar_render(sample_token, pred_data, out_path, ax[0])
+
+    ax[1] = plt.subplot2grid(shape=(4, 12), loc=(1, 0), colspan=2)
+    ax[2] = plt.subplot2grid(shape=(4, 12), loc=(0, 1), colspan=2)
+    ax[3] = plt.subplot2grid(shape=(4, 12), loc=(1, 2), colspan=2)
+    ax[4] = plt.subplot2grid(shape=(4, 12), loc=(2, 0), colspan=2)
+    ax[5] = plt.subplot2grid(shape=(4, 12), loc=(3, 1), colspan=2)
+    ax[6] = plt.subplot2grid(shape=(4, 12), loc=(2, 2), colspan=2)
+
+    ax[7] = plt.subplot2grid(shape=(4, 12), loc=(1, 8), colspan=2)
+    ax[8] = plt.subplot2grid(shape=(4, 12), loc=(0, 9), colspan=2)
+    ax[9] = plt.subplot2grid(shape=(4, 12), loc=(1, 10), colspan=2)
+    ax[10] = plt.subplot2grid(shape=(4, 12), loc=(2, 8), colspan=2)
+    ax[11] = plt.subplot2grid(shape=(4, 12), loc=(3, 9), colspan=2)
+    ax[12] = plt.subplot2grid(shape=(4, 12), loc=(2, 10), colspan=2)
+    
     for ind, cam in enumerate(cams):
         sample_data_token = sample['data'][cam]
 
@@ -429,9 +466,7 @@ def render_sample_data(
             data_path, boxes_pred, camera_intrinsic = get_predicted_data(sample_data_token,
                                                                          box_vis_level=box_vis_level, pred_anns=boxes)
             _, boxes_gt, _ = nusc.get_sample_data(sample_data_token, box_vis_level=box_vis_level)
-            if ind == 3:
-                j += 1
-            ind = ind % 3
+
             data = Image.open(data_path)
             # mmcv.imwrite(np.array(data)[:,:,::-1], f'{cam}.png')
             # Init axes.
@@ -442,47 +477,46 @@ def render_sample_data(
                 image_name = split_name[0] + '_' + os.path.splitext(split_name[2])[0]
 
             # Show image.
-            ax[j+1, ind].imshow(data)
-            ax[j+4, ind].imshow(data)
+            ax[ind+1].imshow(data)
+            ax[ind+7].imshow(data)
 
             # Show boxes.
             if with_anns:
-                for box in boxes_pred:
-                    c = np.array(get_color(box.name)) / 255.0
-                    box.render(ax[j+1, ind], view=camera_intrinsic, normalize=True, colors=(c, c, c))
                 for box in boxes_gt:
                     c = np.array(get_color(box.name)) / 255.0
-                    box.render(ax[j+4, ind], view=camera_intrinsic, normalize=True, colors=(c, c, c))
+                    box.render(ax[ind+1], view=camera_intrinsic, normalize=True, colors=(c, c, c))
+                for box in boxes_pred:
+                    c = np.array(get_color(box.name)) / 255.0
+                    box.render(ax[ind+7], view=camera_intrinsic, normalize=True, colors=(c, c, c))
 
             # Limit visible range.
-            ax[j+1, ind].set_xlim(0, data.size[0])
-            ax[j+1, ind].set_ylim(data.size[1], 0)
-            ax[j+4, ind].set_xlim(0, data.size[0])
-            ax[j+4, ind].set_ylim(data.size[1], 0)
+            ax[ind+1].set_xlim(0, data.size[0])
+            ax[ind+1].set_ylim(data.size[1], 0)
+            ax[ind+7].set_xlim(0, data.size[0])
+            ax[ind+7].set_ylim(data.size[1], 0)
 
         else:
             raise ValueError("Error: Unknown sensor modality!")
 
-        ax[j, ind].axis('off')
-        ax[j+3, ind].axis('off')
+        ax[ind+1].axis('off')
+        ax[ind+7].axis('off')
+        # ax[ind+1].set_aspect('equal')
+        # ax[ind+7].set_aspect('equal')
 
-        ax[j+1, ind].axis('off')
-        ax[j+1, ind].set_title('PRED: {} {labels_type}'.format(
-            sd_record['channel'], labels_type='(predictions)' if lidarseg_preds_bin_path else ''))
-        ax[j+1, ind].set_aspect('equal')
+    print('Rendering sample: %s' % image_name)
+    ax[0].set_title(image_name, fontsize=24)
+    ax[2].set_title('GT', fontsize=24, color='r', fontweight='bold')
+    ax[8].set_title('Pred', fontsize=24, fontweight='bold')
 
-        ax[j+4, ind].axis('off')
-        ax[j+4, ind].set_title('GT:{} {labels_type}'.format(
-            sd_record['channel'], labels_type='(predictions)' if lidarseg_preds_bin_path else ''))
-        ax[j+4, ind].set_aspect('equal')
-
+    plt.tight_layout()
     out_path = os.path.join(out_path, image_name)
-    plt.savefig(out_path + '_camera', bbox_inches='tight', pad_inches=0, dpi=200)
+    # plt.savefig(out_path, bbox_inches='tight', pad_inches=0, dpi=200)
+    plt.savefig(out_path)
     # if verbose:
     #     plt.show()
     plt.close()
-
-    lidiar_render(sample_token, pred_data, out_path=out_path)
+    
+    return split_name[0] if len(split_name) > 0 else ''
 
 
 def parse_args():
@@ -525,15 +559,17 @@ def main(args, nusc):
 
                 print('---Scene token ' + scene['token'])
                 for sample_token in sample_token_list[st_index:end_index+1]:
-                    render_sample_data(sample_token, pred_data=bevformer_results, out_path=save_dir)
+                    scene_name = render_sample_data(sample_token, pred_data=bevformer_results, out_path=save_dir)
                 if i == args.amount:
                     break
+
+            create_video(save_dir, scene_name)
 
     else:
         if args.random:
             shuffle(sample_token_list)
         for sample_token in sample_token_list[:args.amount]:
-            render_sample_data(sample_token, pred_data=bevformer_results, out_path=save_dir)
+            _ = render_sample_data(sample_token, pred_data=bevformer_results, out_path=save_dir)
 
 
 if __name__ == '__main__':
