@@ -54,7 +54,8 @@ def create_video(save_dir, scene_name):
     if os.path.isfile(video_path):
         os.remove(video_path)
 
-    all_frames = sorted([os.path.join(save_dir, cur_img) for cur_img in os.listdir(save_dir) if scene_name in cur_img and cur_img.endswith('_bev.png')])
+    scene_path = os.path.join(save_dir, scene_name)
+    all_frames = sorted([os.path.join(scene_path, cur_img) for cur_img in os.listdir(scene_path)])
     # all_frames.sort(key=lambda x: int(os.path.basename(x).split('_')[1].split('.')[0]))
     fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
 
@@ -375,7 +376,7 @@ def render_sample_data(
         with_anns: bool = True,
         box_vis_level: BoxVisibility = BoxVisibility.ANY,
         axes_limit: float = 40,
-        ax=None,
+        new_scene: bool = False,
         nsweeps: int = 1,
         out_path: str = None,
         underlay_map: bool = True,
@@ -426,10 +427,11 @@ def render_sample_data(
     ]
     split_name = None
     image_name = None
+    scene_name = None
 
     fig = plt.figure()
     fig.set_figheight(16)
-    fig.set_figwidth(40)
+    fig.set_figwidth(46)
     ax = 13 * [None]
     
     ax[0] = plt.subplot2grid(shape=(4, 12), loc=(0, 4), colspan=4, rowspan=4)
@@ -474,7 +476,21 @@ def render_sample_data(
             if not image_name:
                 basename = os.path.basename(data_path)
                 split_name = basename.split('__')
-                image_name = split_name[0] + '_' + os.path.splitext(split_name[2])[0]
+                scene_name = split_name[0]
+                image_name = scene_name + '_' + os.path.splitext(split_name[2])[0]
+
+                if new_scene:
+                    counter = 2
+                    while os.path.exists(os.path.join(out_path, scene_name)):
+                        scene_name = f'{split_name[0]}_{counter}'
+                        counter += 1
+                    out_path = os.path.join(out_path, scene_name)
+                    os.makedirs(out_path, exist_ok=True)
+                else:
+                    scene_folders = sorted([name for name in os.listdir(out_path) if os.path.isdir(os.path.join(out_path, name)) and scene_name in name])
+                    if len(scene_folders) > 0:
+                        scene_name = scene_folders[-1]
+                        out_path = os.path.join(out_path, scene_name)
 
             # Show image.
             ax[ind+1].imshow(data)
@@ -516,7 +532,7 @@ def render_sample_data(
     #     plt.show()
     plt.close()
     
-    return split_name[0] if len(split_name) > 0 else ''
+    return scene_name if split_name else None
 
 
 def parse_args():
@@ -550,26 +566,28 @@ def main(args, nusc):
         if args.random:
             shuffle(scenes_list)
         for scene in scenes_list:
+            if i == args.amount:
+                break
+            new_scene = True
             first_sample_token = scene['first_sample_token']
             last_sample_token = scene['last_sample_token']
             if first_sample_token in sample_token_list:
                 st_index = sample_token_list.index(first_sample_token)
                 end_index = sample_token_list.index(last_sample_token)
-                i += 1
 
                 print('---Scene token ' + scene['token'])
                 for sample_token in sample_token_list[st_index:end_index+1]:
-                    scene_name = render_sample_data(sample_token, pred_data=bevformer_results, out_path=save_dir)
-                if i == args.amount:
-                    break
+                    scene_name = render_sample_data(sample_token, pred_data=bevformer_results, out_path=save_dir, new_scene=new_scene)
+                    new_scene = False
 
-            create_video(save_dir, scene_name)
+                create_video(save_dir, scene_name)
+                i += 1
 
     else:
         if args.random:
             shuffle(sample_token_list)
         for sample_token in sample_token_list[:args.amount]:
-            _ = render_sample_data(sample_token, pred_data=bevformer_results, out_path=save_dir)
+            _ = render_sample_data(sample_token, pred_data=bevformer_results, out_path=save_dir, new_scene=False)
 
 
 if __name__ == '__main__':
