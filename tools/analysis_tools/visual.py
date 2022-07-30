@@ -294,7 +294,7 @@ def get_predicted_data(sample_data_token: str,
     return data_path, box_list, cam_intrinsic
 
 
-def lidiar_render(sample_token, data, out_path=None, ax=None):
+def lidiar_render(sample_token, data, track, out_path=None, ax=None):
     bbox_gt_list = []
     bbox_pred_list = []
     anns = nusc.get('sample', sample_token)['anns']
@@ -318,6 +318,12 @@ def lidiar_render(sample_token, data, out_path=None, ax=None):
 
     bbox_anns = data['results'][sample_token]
     for content in bbox_anns:
+        if track:
+            det_name=content['tracking_name']
+            det_score=-1.0 if 'tracking_score' not in content else float(content['tracking_score'])[0],
+        else:
+            det_name=content['detection_name']
+            det_score=-1.0 if 'detection_score' not in content else float(content['detection_score'])
         bbox_pred_list.append(DetectionBox(
             sample_token=content['sample_token'],
             translation=tuple(content['translation']),
@@ -327,8 +333,8 @@ def lidiar_render(sample_token, data, out_path=None, ax=None):
             ego_translation=(0.0, 0.0, 0.0) if 'ego_translation' not in content
             else tuple(content['ego_translation']),
             num_pts=-1 if 'num_pts' not in content else int(content['num_pts']),
-            detection_name=content['detection_name'],
-            detection_score=-1.0 if 'detection_score' not in content else float(content['detection_score']),
+            detection_name=det_name,
+            detection_score=det_score,
             attribute_name=content['attribute_name']))
     gt_annotations = EvalBoxes()
     pred_annotations = EvalBoxes()
@@ -377,6 +383,7 @@ def render_sample_data(
         box_vis_level: BoxVisibility = BoxVisibility.ANY,
         axes_limit: float = 40,
         new_scene: bool = False,
+        track: bool = False,
         nsweeps: int = 1,
         out_path: str = None,
         underlay_map: bool = True,
@@ -435,7 +442,7 @@ def render_sample_data(
     ax = 13 * [None]
     
     ax[0] = plt.subplot2grid(shape=(4, 12), loc=(0, 4), colspan=4, rowspan=4)
-    lidiar_render(sample_token, pred_data, out_path, ax[0])
+    lidiar_render(sample_token, pred_data, track, out_path, ax[0])
 
     ax[1] = plt.subplot2grid(shape=(4, 12), loc=(1, 0), colspan=2)
     ax[2] = plt.subplot2grid(shape=(4, 12), loc=(0, 1), colspan=2)
@@ -461,10 +468,14 @@ def render_sample_data(
             assert False
         elif sensor_modality == 'camera':
             # Load boxes and image.
-            boxes = [Box(record['translation'], record['size'], Quaternion(record['rotation']),
-                         name=record['detection_name'], token='predicted') for record in
-                     pred_data['results'][sample_token] if record['detection_score'] > 0.2]
-
+            if track:
+                boxes = [Box(record['translation'], record['size'], Quaternion(record['rotation']),
+                            name=record['tracking_name'], token='predicted') for record in
+                        pred_data['results'][sample_token] if record['tracking_score'] > 0.2]
+            else:
+                boxes = [Box(record['translation'], record['size'], Quaternion(record['rotation']),
+                            name=record['detection_name'], token='predicted') for record in
+                        pred_data['results'][sample_token] if record['detection_score'] > 0.2]
             data_path, boxes_pred, camera_intrinsic = get_predicted_data(sample_data_token,
                                                                          box_vis_level=box_vis_level, pred_anns=boxes)
             _, boxes_gt, _ = nusc.get_sample_data(sample_data_token, box_vis_level=box_vis_level)
@@ -544,6 +555,7 @@ def parse_args():
     parser.add_argument('--scene_video', action='store_true', help='visualize entire scene')
     parser.add_argument('--random', action='store_true', help='pick samples randomly')
     parser.add_argument('--seed', type=int, default=0, help='random seed')
+    parser.add_argument('--track', action='store_true', help='activate for tracking visualization')
     args = parser.parse_args()
 
     return args
@@ -577,7 +589,7 @@ def main(args, nusc):
 
                 print('---Scene token ' + scene['token'])
                 for sample_token in sample_token_list[st_index:end_index+1]:
-                    scene_name = render_sample_data(sample_token, pred_data=bevformer_results, out_path=save_dir, new_scene=new_scene)
+                    scene_name = render_sample_data(sample_token, pred_data=bevformer_results, out_path=save_dir, new_scene=new_scene, track=args.track)
                     new_scene = False
 
                 create_video(save_dir, scene_name)
@@ -587,7 +599,7 @@ def main(args, nusc):
         if args.random:
             shuffle(sample_token_list)
         for sample_token in sample_token_list[:args.amount]:
-            _ = render_sample_data(sample_token, pred_data=bevformer_results, out_path=save_dir, new_scene=False)
+            _ = render_sample_data(sample_token, pred_data=bevformer_results, out_path=save_dir, new_scene=False, track=args.track)
 
 
 if __name__ == '__main__':
