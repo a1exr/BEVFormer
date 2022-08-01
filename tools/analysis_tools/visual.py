@@ -453,19 +453,19 @@ def render_sample_data(
     scene_name = None
 
     fig = plt.figure()
-    fig.set_figheight(35)
-    fig.set_figwidth(21)
+    fig.set_figheight(20)
+    fig.set_figwidth(40)
     ax = 7 * [None]
     
-    ax[0] = plt.subplot2grid(shape=(8, 4), loc=(0, 0), colspan=4, rowspan=4)
+    ax[0] = plt.subplot2grid(shape=(4, 8), loc=(0, 0), colspan=4, rowspan=4)
     lidiar_render(sample_token, det_data, track_data, out_path, ax[0])
 
-    ax[1] = plt.subplot2grid(shape=(8, 4), loc=(5, 0), colspan=2)
-    ax[2] = plt.subplot2grid(shape=(8, 4), loc=(4, 1), colspan=2)
-    ax[3] = plt.subplot2grid(shape=(8, 4), loc=(5, 2), colspan=2)
-    ax[4] = plt.subplot2grid(shape=(8, 4), loc=(6, 0), colspan=2)
-    ax[5] = plt.subplot2grid(shape=(8, 4), loc=(7, 1), colspan=2)
-    ax[6] = plt.subplot2grid(shape=(8, 4), loc=(6, 2), colspan=2)
+    ax[1] = plt.subplot2grid(shape=(4, 8), loc=(1, 4), colspan=2)
+    ax[2] = plt.subplot2grid(shape=(4, 8), loc=(0, 5), colspan=2)
+    ax[3] = plt.subplot2grid(shape=(4, 8), loc=(1, 6), colspan=2)
+    ax[4] = plt.subplot2grid(shape=(4, 8), loc=(2, 4), colspan=2)
+    ax[5] = plt.subplot2grid(shape=(4, 8), loc=(3, 5), colspan=2)
+    ax[6] = plt.subplot2grid(shape=(4, 8), loc=(2, 6), colspan=2)
     
     for ind, cam in enumerate(cams):
         sample_data_token = sample['data'][cam]
