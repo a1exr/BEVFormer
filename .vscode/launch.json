@@ -8,7 +8,7 @@
             "name": "Python: BEVFormer",
             "type": "python",
             "request": "launch",
-            "args": ["--dataroot","/home/eeproj4/Alex/HDMapNet/dataset/nuscenes/mini","--version","v1.0-mini","--results_dir","test/bevformer_base_mini/Sun_Jul_24_21_05_34_2022/pts_bbox","--amount","10","--scene_video"],
+            "args": ["--dataroot","/home/eeproj4/Alex/mmdetection3d/BEVFormer/data/nuscenes/mini","--version","v1.0-mini","--results_dir","test/bevformer_base_mini/Sun_Jul_24_21_05_34_2022/pts_bbox","--amount","10","--scene_video"],
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false

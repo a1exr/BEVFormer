@@ -294,14 +294,12 @@ def get_predicted_data(sample_data_token: str,
     return data_path, box_list, cam_intrinsic
 
 
-def lidiar_render(sample_token, det_data, track_data, out_path=None, ax=None):
+def lidiar_render(sample_token, data, track, out_path=None, ax=None):
     bbox_gt_list = []
-    bbox_det_list = []
-    bbox_track_list = []
+    bbox_pred_list = []
     anns = nusc.get('sample', sample_token)['anns']
     for ann in anns:
         content = nusc.get('sample_annotation', ann)
-        # GT
         try:
             bbox_gt_list.append(DetectionBox(
                 sample_token=content['sample_token'],
@@ -318,10 +316,15 @@ def lidiar_render(sample_token, det_data, track_data, out_path=None, ax=None):
         except:
             pass
 
-    # Detection
-    bbox_anns = det_data['results'][sample_token]
+    bbox_anns = data['results'][sample_token]
     for content in bbox_anns:
-        bbox_det_list.append(DetectionBox(
+        if track:
+            det_name=content['tracking_name']
+            det_score=-1.0 if 'tracking_score' not in content else float(content['tracking_score'])[0],
+        else:
+            det_name=content['detection_name']
+            det_score=-1.0 if 'detection_score' not in content else float(content['detection_score'])
+        bbox_pred_list.append(DetectionBox(
             sample_token=content['sample_token'],
             translation=tuple(content['translation']),
             size=tuple(content['size']),
@@ -330,36 +333,17 @@ def lidiar_render(sample_token, det_data, track_data, out_path=None, ax=None):
             ego_translation=(0.0, 0.0, 0.0) if 'ego_translation' not in content
             else tuple(content['ego_translation']),
             num_pts=-1 if 'num_pts' not in content else int(content['num_pts']),
-            detection_name=content['detection_name'],
-            detection_score=-1.0 if 'detection_score' not in content else float(content['detection_score']),
+            detection_name=det_name,
+            detection_score=det_score,
             attribute_name=content['attribute_name']))
-
-    # Tracking
-    bbox_anns = track_data['results'][sample_token]
-    for content in bbox_anns:
-        bbox_track_list.append(DetectionBox(
-            sample_token=content['sample_token'],
-            translation=tuple(content['translation']),
-            size=tuple(content['size']),
-            rotation=tuple(content['rotation']),
-            velocity=tuple(content['velocity']),
-            ego_translation=(0.0, 0.0, 0.0) if 'ego_translation' not in content
-            else tuple(content['ego_translation']),
-            num_pts=-1 if 'num_pts' not in content else int(content['num_pts']),
-            detection_name=content['tracking_name'],
-            detection_score=-1.0 if 'tracking_score' not in content else float(content['tracking_score']),
-            attribute_name=content['attribute_name']))
-
     gt_annotations = EvalBoxes()
-    det_pred_annotations = EvalBoxes()
-    track_pred_annotations = EvalBoxes()
+    pred_annotations = EvalBoxes()
     gt_annotations.add_boxes(sample_token, bbox_gt_list)
-    det_pred_annotations.add_boxes(sample_token, bbox_det_list)
-    track_pred_annotations.add_boxes(sample_token, bbox_track_list)
+    pred_annotations.add_boxes(sample_token, bbox_pred_list)
     # print('green is ground truth')
     # print('blue is the predited result')
     # visualize_sample(nusc, sample_token, gt_annotations, pred_annotations, savepath=out_path + '_bev')
-    visualize_sample(nusc, sample_token, gt_annotations, det_pred_annotations, track_pred_annotations, ax)
+    visualize_sample(nusc, sample_token, gt_annotations, pred_annotations, ax)
 
 
 def get_color(category_name: str):
@@ -393,12 +377,141 @@ def get_color(category_name: str):
     return [0, 0, 0]
 
 
+def get_frame_det(
+        sample_token: str,
+        pred_data=None,
+      ) -> None:
+
+    sample = nusc.get('sample', sample_token)
+    cams = [
+        'CAM_FRONT_LEFT',
+        'CAM_FRONT',
+        'CAM_FRONT_RIGHT',
+        'CAM_BACK_LEFT',
+        'CAM_BACK',
+        'CAM_BACK_RIGHT',
+    ]
+    # split_name = None
+    # image_name = None
+    # scene_name = None
+
+    # fig = plt.figure()
+    # fig.set_figheight(16)
+    # fig.set_figwidth(46)
+    # ax = 13 * [None]
+    
+    # ax[0] = plt.subplot2grid(shape=(4, 12), loc=(0, 4), colspan=4, rowspan=4)
+    # lidiar_render(sample_token, pred_data, track, out_path, ax[0])
+
+    # ax[1] = plt.subplot2grid(shape=(4, 12), loc=(1, 0), colspan=2)
+    # ax[2] = plt.subplot2grid(shape=(4, 12), loc=(0, 1), colspan=2)
+    # ax[3] = plt.subplot2grid(shape=(4, 12), loc=(1, 2), colspan=2)
+    # ax[4] = plt.subplot2grid(shape=(4, 12), loc=(2, 0), colspan=2)
+    # ax[5] = plt.subplot2grid(shape=(4, 12), loc=(3, 1), colspan=2)
+    # ax[6] = plt.subplot2grid(shape=(4, 12), loc=(2, 2), colspan=2)
+
+    # ax[7] = plt.subplot2grid(shape=(4, 12), loc=(1, 8), colspan=2)
+    # ax[8] = plt.subplot2grid(shape=(4, 12), loc=(0, 9), colspan=2)
+    # ax[9] = plt.subplot2grid(shape=(4, 12), loc=(1, 10), colspan=2)
+    # ax[10] = plt.subplot2grid(shape=(4, 12), loc=(2, 8), colspan=2)
+    # ax[11] = plt.subplot2grid(shape=(4, 12), loc=(3, 9), colspan=2)
+    # ax[12] = plt.subplot2grid(shape=(4, 12), loc=(2, 10), colspan=2)
+    
+    for ind, cam in enumerate(cams):
+        sample_data_token = sample['data'][cam]
+
+        sd_record = nusc.get('sample_data', sample_data_token)
+        sensor_modality = sd_record['sensor_modality']
+
+        if sensor_modality in ['lidar', 'radar']:
+            assert False
+        elif sensor_modality == 'camera':
+            # Load boxes and image.
+            if track:
+                boxes = [Box(record['translation'], record['size'], Quaternion(record['rotation']),
+                            name=record['tracking_name'], token='predicted') for record in
+                        pred_data['results'][sample_token] if record['tracking_score'] > 0.2]
+            else:
+                boxes = [Box(record['translation'], record['size'], Quaternion(record['rotation']),
+                            name=record['detection_name'], token='predicted') for record in
+                        pred_data['results'][sample_token] if record['detection_score'] > 0.2]
+            data_path, boxes_pred, camera_intrinsic = get_predicted_data(sample_data_token,
+                                                                         box_vis_level=box_vis_level, pred_anns=boxes)
+            _, boxes_gt, _ = nusc.get_sample_data(sample_data_token, box_vis_level=box_vis_level)
+
+            data = Image.open(data_path)
+            # mmcv.imwrite(np.array(data)[:,:,::-1], f'{cam}.png')
+            # Init axes.
+
+            if not image_name:
+                basename = os.path.basename(data_path)
+                split_name = basename.split('__')
+                scene_name = split_name[0]
+                image_name = scene_name + '_' + os.path.splitext(split_name[2])[0]
+
+                if new_scene:
+                    counter = 2
+                    while os.path.exists(os.path.join(out_path, scene_name)):
+                        scene_name = f'{split_name[0]}_{counter}'
+                        counter += 1
+                    out_path = os.path.join(out_path, scene_name)
+                    os.makedirs(out_path, exist_ok=True)
+                else:
+                    scene_folders = sorted([name for name in os.listdir(out_path) if os.path.isdir(os.path.join(out_path, name)) and scene_name in name])
+                    if len(scene_folders) > 0:
+                        scene_name = scene_folders[-1]
+                        out_path = os.path.join(out_path, scene_name)
+
+            # Show image.
+            ax[ind+1].imshow(data)
+            ax[ind+7].imshow(data)
+
+            # Show boxes.
+            if with_anns:
+                for box in boxes_gt:
+                    c = np.array(get_color(box.name)) / 255.0
+                    box.render(ax[ind+1], view=camera_intrinsic, normalize=True, colors=(c, c, c))
+                for box in boxes_pred:
+                    c = np.array(get_color(box.name)) / 255.0
+                    box.render(ax[ind+7], view=camera_intrinsic, normalize=True, colors=(c, c, c))
+
+            # Limit visible range.
+            ax[ind+1].set_xlim(0, data.size[0])
+            ax[ind+1].set_ylim(data.size[1], 0)
+            ax[ind+7].set_xlim(0, data.size[0])
+            ax[ind+7].set_ylim(data.size[1], 0)
+
+        else:
+            raise ValueError("Error: Unknown sensor modality!")
+
+        ax[ind+1].axis('off')
+        ax[ind+7].axis('off')
+        # ax[ind+1].set_aspect('equal')
+        # ax[ind+7].set_aspect('equal')
+
+    print('Rendering sample: %s' % image_name)
+    ax[0].set_title(image_name, fontsize=24)
+    ax[2].set_title('GT', fontsize=24, color='r', fontweight='bold')
+    ax[8].set_title('Pred', fontsize=24, fontweight='bold')
+
+    plt.tight_layout()
+    out_path = os.path.join(out_path, image_name)
+    # plt.savefig(out_path, bbox_inches='tight', pad_inches=0, dpi=200)
+    plt.savefig(out_path)
+    # if verbose:
+    #     plt.show()
+    plt.close()
+    
+    return scene_name if split_name else None
+
+
 def render_sample_data(
         sample_token: str,
         with_anns: bool = True,
         box_vis_level: BoxVisibility = BoxVisibility.ANY,
         axes_limit: float = 40,
         new_scene: bool = False,
+        track: bool = False,
         nsweeps: int = 1,
         out_path: str = None,
         underlay_map: bool = True,
@@ -409,8 +522,7 @@ def render_sample_data(
         lidarseg_preds_bin_path: str = None,
         verbose: bool = True,
         show_panoptic: bool = False,
-        det_data=None,
-        track_data=None,
+        pred_data=None,
       ) -> None:
     """
     Render sample data onto axis.
@@ -453,19 +565,26 @@ def render_sample_data(
     scene_name = None
 
     fig = plt.figure()
-    fig.set_figheight(35)
-    fig.set_figwidth(21)
-    ax = 7 * [None]
+    fig.set_figheight(16)
+    fig.set_figwidth(46)
+    ax = 13 * [None]
     
-    ax[0] = plt.subplot2grid(shape=(8, 4), loc=(0, 0), colspan=4, rowspan=4)
-    lidiar_render(sample_token, det_data, track_data, out_path, ax[0])
+    ax[0] = plt.subplot2grid(shape=(4, 12), loc=(0, 4), colspan=4, rowspan=4)
+    lidiar_render(sample_token, pred_data, track, out_path, ax[0])
 
-    ax[1] = plt.subplot2grid(shape=(8, 4), loc=(5, 0), colspan=2)
-    ax[2] = plt.subplot2grid(shape=(8, 4), loc=(4, 1), colspan=2)
-    ax[3] = plt.subplot2grid(shape=(8, 4), loc=(5, 2), colspan=2)
-    ax[4] = plt.subplot2grid(shape=(8, 4), loc=(6, 0), colspan=2)
-    ax[5] = plt.subplot2grid(shape=(8, 4), loc=(7, 1), colspan=2)
-    ax[6] = plt.subplot2grid(shape=(8, 4), loc=(6, 2), colspan=2)
+    ax[1] = plt.subplot2grid(shape=(4, 12), loc=(1, 0), colspan=2)
+    ax[2] = plt.subplot2grid(shape=(4, 12), loc=(0, 1), colspan=2)
+    ax[3] = plt.subplot2grid(shape=(4, 12), loc=(1, 2), colspan=2)
+    ax[4] = plt.subplot2grid(shape=(4, 12), loc=(2, 0), colspan=2)
+    ax[5] = plt.subplot2grid(shape=(4, 12), loc=(3, 1), colspan=2)
+    ax[6] = plt.subplot2grid(shape=(4, 12), loc=(2, 2), colspan=2)
+
+    ax[7] = plt.subplot2grid(shape=(4, 12), loc=(1, 8), colspan=2)
+    ax[8] = plt.subplot2grid(shape=(4, 12), loc=(0, 9), colspan=2)
+    ax[9] = plt.subplot2grid(shape=(4, 12), loc=(1, 10), colspan=2)
+    ax[10] = plt.subplot2grid(shape=(4, 12), loc=(2, 8), colspan=2)
+    ax[11] = plt.subplot2grid(shape=(4, 12), loc=(3, 9), colspan=2)
+    ax[12] = plt.subplot2grid(shape=(4, 12), loc=(2, 10), colspan=2)
     
     for ind, cam in enumerate(cams):
         sample_data_token = sample['data'][cam]
@@ -477,9 +596,14 @@ def render_sample_data(
             assert False
         elif sensor_modality == 'camera':
             # Load boxes and image.
-            boxes = [Box(record['translation'], record['size'], Quaternion(record['rotation']),
-                        name=record['detection_name'], token='predicted') for record in
-                    det_data['results'][sample_token] if record['detection_score'] > 0.2]
+            if track:
+                boxes = [Box(record['translation'], record['size'], Quaternion(record['rotation']),
+                            name=record['tracking_name'], token='predicted') for record in
+                        pred_data['results'][sample_token] if record['tracking_score'] > 0.2]
+            else:
+                boxes = [Box(record['translation'], record['size'], Quaternion(record['rotation']),
+                            name=record['detection_name'], token='predicted') for record in
+                        pred_data['results'][sample_token] if record['detection_score'] > 0.2]
             data_path, boxes_pred, camera_intrinsic = get_predicted_data(sample_data_token,
                                                                          box_vis_level=box_vis_level, pred_anns=boxes)
             _, boxes_gt, _ = nusc.get_sample_data(sample_data_token, box_vis_level=box_vis_level)
@@ -509,29 +633,35 @@ def render_sample_data(
 
             # Show image.
             ax[ind+1].imshow(data)
+            ax[ind+7].imshow(data)
 
             # Show boxes.
             if with_anns:
                 for box in boxes_gt:
                     c = np.array(get_color(box.name)) / 255.0
                     box.render(ax[ind+1], view=camera_intrinsic, normalize=True, colors=(c, c, c))
-                # for box in boxes_pred:
-                #     c = np.array(get_color(box.name)) / 255.0
-                #     box.render(ax[ind+7], view=camera_intrinsic, normalize=True, colors=(c, c, c))
+                for box in boxes_pred:
+                    c = np.array(get_color(box.name)) / 255.0
+                    box.render(ax[ind+7], view=camera_intrinsic, normalize=True, colors=(c, c, c))
 
             # Limit visible range.
             ax[ind+1].set_xlim(0, data.size[0])
             ax[ind+1].set_ylim(data.size[1], 0)
+            ax[ind+7].set_xlim(0, data.size[0])
+            ax[ind+7].set_ylim(data.size[1], 0)
 
         else:
             raise ValueError("Error: Unknown sensor modality!")
 
         ax[ind+1].axis('off')
+        ax[ind+7].axis('off')
+        # ax[ind+1].set_aspect('equal')
+        # ax[ind+7].set_aspect('equal')
 
     print('Rendering sample: %s' % image_name)
     ax[0].set_title(image_name, fontsize=24)
     ax[2].set_title('GT', fontsize=24, color='r', fontweight='bold')
-    # ax[8].set_title('Pred', fontsize=24, fontweight='bold')
+    ax[8].set_title('Pred', fontsize=24, fontweight='bold')
 
     plt.tight_layout()
     out_path = os.path.join(out_path, image_name)
@@ -548,56 +678,45 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Visualize BEV results')
     parser.add_argument('--dataroot', type=str, default='./data/nuscenes/trainval')
     parser.add_argument('--version', type=str, default='v1.0-trainval', choices=['v1.0-trainval', 'v1.0-mini'])
-    parser.add_argument('--results_dir', help='the dir where the results jsons are')
-    parser.add_argument('--amount', type=int, default=10, help='number of samples / scenes')
-    parser.add_argument('--scene_video', action='store_true', help='visualize entire scene')
-    parser.add_argument('--random', action='store_true', help='pick samples randomly')
-    parser.add_argument('--seed', type=int, default=0, help='random seed')
+    parser.add_argument('--det_res_dir', help='the dir where the results json is')
     args = parser.parse_args()
 
     return args
 
 
 def main(args, nusc):
-    seed(args.seed)
-    dt = datetime.now()
-    extension = '_rand' if args.random else ''
-    str_dt = dt.strftime("%d-%m-%Y_%H:%M:%S") + extension
-    save_dir = os.path.join(args.results_dir, 'plots', str_dt)
-    os.makedirs(save_dir, exist_ok=True)
+    bevformer_results = mmcv.load(os.path.join(args.det_res_dir, 'results_nusc.json'))
+    sample_token_list = list(bevformer_results['results'].keys())
 
-    bevformer_det_results = mmcv.load(os.path.join(args.results_dir, 'detect_results_nusc.json'))
-    bevformer_track_results = mmcv.load(os.path.join(args.results_dir, 'track_results_nusc.json'))
-    sample_token_list = list(bevformer_det_results['results'].keys())
+    # save_dir = os.path.join(args.det_res_dir, 'plots', str_dt)
+    # os.makedirs(save_dir, exist_ok=True)
 
-    if args.scene_video:
-        i = 0
-        scenes_list = [scene for scene in nusc.scene]
-        if args.random:
-            shuffle(scenes_list)
-        for scene in scenes_list:
-            if i == args.amount:
-                break
-            new_scene = True
-            first_sample_token = scene['first_sample_token']
-            last_sample_token = scene['last_sample_token']
-            if first_sample_token in sample_token_list:
-                st_index = sample_token_list.index(first_sample_token)
-                end_index = sample_token_list.index(last_sample_token)
+    categories = ['car', 'pedestrian', 'bicycle', 'motorcycle', 'bus', 'trailer', 'truck']      # TODO: add to configs
 
-                print('---Scene token ' + scene['token'])
-                for sample_token in sample_token_list[st_index:end_index+1]:
-                    scene_name = render_sample_data(sample_token, det_data=bevformer_det_results, track_data=bevformer_track_results, out_path=save_dir, new_scene=new_scene)
-                    new_scene = False
+    for scene in nusc.scene:
+        # new_scene = True
+        first_sample_token = scene['first_sample_token']
+        last_sample_token = scene['last_sample_token']
+        if first_sample_token in sample_token_list:
+            st_index = sample_token_list.index(first_sample_token)
+            end_index = sample_token_list.index(last_sample_token)
 
-                create_video(save_dir, scene_name)
-                i += 1
+            print('---Scene name ' + scene['name'])
+            scene_tokens_list = sample_token_list[st_index:end_index+1]
+            
+            for sample_token in scene_tokens_list:
+                dets_frame = get_frame_det(sample_token, pred_data=bevformer_results)
+                scene_name = render_sample_data(sample_token, pred_data=bevformer_results, out_path=save_dir, new_scene=new_scene, track=args.track)
+                new_scene = False
+
+            create_video(save_dir, scene_name)
+            i += 1
 
     else:
         if args.random:
             shuffle(sample_token_list)
         for sample_token in sample_token_list[:args.amount]:
-            _ = render_sample_data(sample_token, det_data=bevformer_det_results, track_data=bevformer_track_results, out_path=save_dir, new_scene=False)
+            _ = render_sample_data(sample_token, pred_data=bevformer_results, out_path=save_dir, new_scene=False, track=args.track)
 
 
 if __name__ == '__main__':
