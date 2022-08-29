@@ -312,7 +312,7 @@ def lidiar_render(sample_token, det_data, track_data, out_path=None, ax=None):
                 ego_translation=(0.0, 0.0, 0.0) if 'ego_translation' not in content
                 else tuple(content['ego_translation']),
                 num_pts=-1 if 'num_pts' not in content else int(content['num_pts']),
-                detection_name=category_to_detection_name(content['category_name']),
+                detection_name=category_to_detection_name(content['category_name']),    # TODO: edit categories inside
                 detection_score=-1.0 if 'detection_score' not in content else float(content['detection_score']),
                 attribute_name=''))
         except:
