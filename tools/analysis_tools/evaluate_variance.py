@@ -77,22 +77,19 @@ class Box3D:
             return np.array([bbox.x, bbox.y, bbox.z, bbox.ry, bbox.l, bbox.w, bbox.h, bbox.s])
 
 
-def get_bev_boxes(sample_token, bbox_gt_list, det_list, pose_record, cs_record):
-    gt_annotations = EvalBoxes()
-    gt_annotations.add_boxes(sample_token, bbox_gt_list)
+def get_bev_boxes(sample_token, det_list, pose_record, cs_record):
     det_annotations = EvalBoxes()
     det_annotations.add_boxes(sample_token, det_list)
     # Get BEV boxes.
-    boxes_gt_global = gt_annotations[sample_token]
-    boxes_gt = boxes_to_sensor(boxes_gt_global, pose_record, cs_record)
     boxes_det_global = det_annotations[sample_token]
     boxes_det = boxes_to_sensor(boxes_det_global, pose_record, cs_record)
 
-    return [boxes_gt, boxes_det]
+    boxes_det = process_dets(boxes_det)
+    return boxes_det
 
 
 def calc_instance_mean_and_var(boxes):
-    instance_array = np.array([[cur_box.center[0], cur_box.center[1], cur_box.orientation.angle, cur_box.wlh[1], cur_box.wlh[0]]  for cur_box in boxes])
+    instance_array = np.array([[cur_box.x, cur_box.y, cur_box.ry, cur_box.l, cur_box.w]  for cur_box in boxes])
     instance_mean = np.mean(instance_array, axis=0)
     instance_var = np.var(instance_array, axis=0)
 
@@ -165,21 +162,23 @@ def main(args, nusc):
         category = [cat for cat in categories if cat in content['category_name']]
         if category == []:
             continue
-        sample_token = content['sample_token']
-        if sample_token not in sample_token_list:
-            continue
-
-        sample_rec = nusc.get('sample', sample_token)
-        sd_record = nusc.get('sample_data', sample_rec['data']['LIDAR_TOP'])
-        cs_record = nusc.get('calibrated_sensor', sd_record['calibrated_sensor_token'])
-        pose_record = nusc.get('ego_pose', sd_record['ego_pose_token'])
-        scene_name = os.path.basename(sd_record['filename']).split('__')[0]
         
         bbox_gt_list = []
         bbox_det_list = []
         while 1:
+            sample_token = content['sample_token']
+            if sample_token not in sample_token_list:
+                continue
+
+            sample_rec = nusc.get('sample', sample_token)
+            sd_record = nusc.get('sample_data', sample_rec['data']['LIDAR_TOP'])
+            cs_record = nusc.get('calibrated_sensor', sd_record['calibrated_sensor_token'])
+            pose_record = nusc.get('ego_pose', sd_record['ego_pose_token'])
+            scene_name = os.path.basename(sd_record['filename']).split('__')[0]
+
             # GT
-            bbox_gt_list.append(DetectionBox(
+            tmp_gt = []
+            tmp_gt.append(DetectionBox(
                 sample_token=sample_token,
                 translation=tuple(content['translation']),
                 size=tuple(content['size']),
@@ -192,13 +191,16 @@ def main(args, nusc):
                 detection_score=-1.0 if 'detection_score' not in content else float(content['detection_score']),
                 attribute_name=''))
 
+            gt = get_bev_boxes(sample_token, tmp_gt, pose_record, cs_record)[0]
+            bbox_gt_list.append(gt)
+
             # Detection
             bbox_anns = bevformer_det_results['results'][sample_token]
             nominees_det_list = []
             for cur_bbox in bbox_anns:
                 if cur_bbox['detection_name'] == category[0] and cur_bbox['detection_score'] > 0.3:
                     nominees_det_list.append(DetectionBox(
-                        sample_token=cur_bbox['sample_token'],
+                        sample_token=sample_token,
                         translation=tuple(cur_bbox['translation']),
                         size=tuple(cur_bbox['size']),
                         rotation=tuple(cur_bbox['rotation']),
@@ -211,13 +213,11 @@ def main(args, nusc):
                         attribute_name=cur_bbox['attribute_name']))
 
             if nominees_det_list != []:
-                bev_boxes = get_bev_boxes(sample_token, bbox_gt_list[-1:], nominees_det_list, pose_record, cs_record)
-                gt = process_dets(bev_boxes[0])
-                dets = process_dets(bev_boxes[1])
-                dists = [dist3d_bottom(gt[0], det) for det in dets]
+                dets = get_bev_boxes(sample_token, nominees_det_list, pose_record, cs_record)
+                dists = [dist3d_bottom(gt, det) for det in dets]
                 min_dist_index = np.argmin(dists)
                 if dists[min_dist_index] < 2:
-                    bbox_det_list.append(nominees_det_list[min_dist_index])
+                    bbox_det_list.append(dets[min_dist_index])
 
             if annotation_token == last_annotation_token:
                 break
@@ -226,7 +226,7 @@ def main(args, nusc):
             if category[0] not in content['category_name']:
                 break
         
-        bev_boxes = get_bev_boxes(sample_token, bbox_gt_list, bbox_det_list, pose_record, cs_record)
+        bev_boxes = [bbox_gt_list, bbox_det_list]
 
         for res_mode, boxes in zip(res_modes, bev_boxes):
             if boxes == []:
