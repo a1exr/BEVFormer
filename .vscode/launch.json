@@ -8,7 +8,10 @@
             "name": "Python: BEVFormer",
             "type": "python",
             "request": "launch",
-            "args": ["--dataroot","/home/eeproj4/Alex/mmdetection3d/BEVFormer/data/nuscenes/mini","--version","v1.0-mini","--results_dir","test/bevformer_base_mini/SORT_type_hungar_v8_2D_model_detTH_xz"],
+            "args": ["--dataroot","/home/eeproj4/Alex/mmdetection3d/BEVFormer/data/nuscenes/mini","--version","v1.0-mini","--results_dir","test/bevformer_base_mini/2D_model_detTH_xz_Rdiff_customQ_mini_val"],
+            // "args": ["--dataroot","/home/eeproj4/Alex/mmdetection3d/BEVFormer/data/nuscenes/trainval","--version","v1.0-trainval","--results_dir","test/bevformer_base/2D_model_detTH_xz_val"],
+            // "args": ["--dataroot","/home/eeproj4/Alex/mmdetection3d/BEVFormer/data/nuscenes/trainval","--version","v1.0-trainval","--results_dir","test/bevformer_base/2D_model_detTH_xz_Rdiff_customQ_val","--scene_video","--random","--seed","5","--amount","10"],
+            // "args": ["--dataroot","/home/eeproj4/Alex/mmdetection3d/BEVFormer/data/nuscenes/mini","--version","v1.0-mini","--results_dir","test/bevformer_base_mini/2D_model_detTH_xz_Rdiff_customQ_mini_val","--scene_video","--random","--seed","5","--amount","10"],
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false

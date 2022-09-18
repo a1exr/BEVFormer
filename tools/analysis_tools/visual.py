@@ -40,6 +40,14 @@ cams = ['CAM_FRONT',
  'CAM_BACK_LEFT',
  'CAM_FRONT_LEFT']
 
+detections = ['car',
+ 'pedestrian',
+ 'bicycle',
+ 'motorcycle',
+ 'bus',
+ 'trailer',
+ 'truck']
+
 import numpy as np
 import matplotlib.pyplot as plt
 from nuscenes.utils.data_classes import LidarPointCloud, RadarPointCloud, Box
@@ -60,7 +68,7 @@ def create_video(save_dir, scene_name):
     fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
 
     height, width, channels = cv2.imread(all_frames[0]).shape
-    out = cv2.VideoWriter(video_path, fourcc, 3, (width, height), True)
+    out = cv2.VideoWriter(video_path, fourcc, 2, (width, height), True)
 
     print('Creating Video Animation')
     for filename in tqdm(all_frames):
@@ -298,57 +306,64 @@ def lidiar_render(sample_token, det_data, track_data, out_path=None, ax=None):
     bbox_gt_list = []
     bbox_det_list = []
     bbox_track_list = []
+    # GT
     anns = nusc.get('sample', sample_token)['anns']
     for ann in anns:
         content = nusc.get('sample_annotation', ann)
-        # GT
-        try:
-            bbox_gt_list.append(DetectionBox(
-                sample_token=content['sample_token'],
-                translation=tuple(content['translation']),
-                size=tuple(content['size']),
-                rotation=tuple(content['rotation']),
-                velocity=nusc.box_velocity(content['token'])[:2],
-                ego_translation=(0.0, 0.0, 0.0) if 'ego_translation' not in content
-                else tuple(content['ego_translation']),
-                num_pts=-1 if 'num_pts' not in content else int(content['num_pts']),
-                detection_name=category_to_detection_name(content['category_name']),    # TODO: edit categories inside
-                detection_score=-1.0 if 'detection_score' not in content else float(content['detection_score']),
-                attribute_name=''))
-        except:
-            pass
+        category_name = category_to_detection_name(content['category_name'])
+        if category_name in detections:
+            try:
+                bbox_gt_list.append(DetectionBox(
+                    sample_token=content['sample_token'],
+                    translation=tuple(content['translation']),
+                    size=tuple(content['size']),
+                    rotation=tuple(content['rotation']),
+                    velocity=nusc.box_velocity(content['token'])[:2],
+                    ego_translation=(0.0, 0.0, 0.0) if 'ego_translation' not in content
+                    else tuple(content['ego_translation']),
+                    num_pts=-1 if 'num_pts' not in content else int(content['num_pts']),
+                    detection_name=category_name,
+                    detection_score=-1.0 if 'detection_score' not in content else float(content['detection_score']),
+                    attribute_name=''))
+            except:
+                pass
 
     # Detection
     bbox_anns = det_data['results'][sample_token]
     for content in bbox_anns:
-        bbox_det_list.append(DetectionBox(
-            sample_token=content['sample_token'],
-            translation=tuple(content['translation']),
-            size=tuple(content['size']),
-            rotation=tuple(content['rotation']),
-            velocity=tuple(content['velocity']),
-            ego_translation=(0.0, 0.0, 0.0) if 'ego_translation' not in content
-            else tuple(content['ego_translation']),
-            num_pts=-1 if 'num_pts' not in content else int(content['num_pts']),
-            detection_name=content['detection_name'],
-            detection_score=-1.0 if 'detection_score' not in content else float(content['detection_score']),
-            attribute_name=content['attribute_name']))
+        category_name = content['detection_name']
+        detection_score = -1.0 if 'detection_score' not in content else float(content['detection_score'])
+        if category_name in detections and detection_score > 0.3:
+            bbox_det_list.append(DetectionBox(
+                sample_token=content['sample_token'],
+                translation=tuple(content['translation']),
+                size=tuple(content['size']),
+                rotation=tuple(content['rotation']),
+                velocity=tuple(content['velocity']),
+                ego_translation=(0.0, 0.0, 0.0) if 'ego_translation' not in content
+                else tuple(content['ego_translation']),
+                num_pts=-1 if 'num_pts' not in content else int(content['num_pts']),
+                detection_name=category_name,
+                detection_score=detection_score,
+                attribute_name=content['attribute_name']))
 
     # Tracking
     bbox_anns = track_data['results'][sample_token]
     for content in bbox_anns:
-        bbox_track_list.append(DetectionBox(
-            sample_token=content['sample_token'],
-            translation=tuple(content['translation']),
-            size=tuple(content['size']),
-            rotation=tuple(content['rotation']),
-            velocity=tuple(content['velocity']),
-            ego_translation=(0.0, 0.0, 0.0) if 'ego_translation' not in content
-            else tuple(content['ego_translation']),
-            num_pts=-1 if 'num_pts' not in content else int(content['num_pts']),
-            detection_name=content['tracking_name'],
-            detection_score=-1.0 if 'tracking_score' not in content else float(content['tracking_score']),
-            attribute_name=content['attribute_name']))
+        tracking_score = -1.0 if 'tracking_score' not in content else float(content['tracking_score'])
+        if tracking_score > 0.4:
+            bbox_track_list.append(DetectionBox(
+                sample_token=content['sample_token'],
+                translation=tuple(content['translation']),
+                size=tuple(content['size']),
+                rotation=tuple(content['rotation']),
+                velocity=tuple(content['velocity']),
+                ego_translation=(0.0, 0.0, 0.0) if 'ego_translation' not in content
+                else tuple(content['ego_translation']),
+                num_pts=-1 if 'num_pts' not in content else int(content['num_pts']),
+                detection_name=content['tracking_name'],
+                detection_score=tracking_score,
+                attribute_name=content['attribute_name']))
 
     gt_annotations = EvalBoxes()
     det_pred_annotations = EvalBoxes()
@@ -398,7 +413,7 @@ def render_sample_data(
         with_anns: bool = True,
         box_vis_level: BoxVisibility = BoxVisibility.ANY,
         axes_limit: float = 40,
-        new_scene: bool = False,
+        # new_scene: bool = False,
         nsweeps: int = 1,
         out_path: str = None,
         underlay_map: bool = True,
@@ -439,6 +454,7 @@ def render_sample_data(
         If show_lidarseg is True, show_panoptic will be set to False.
     """
     sample = nusc.get('sample', sample_token)
+    timestamp = str(sample['timestamp'])
     # sample = data['results'][sample_token_list[0]][0]
     cams = [
         'CAM_FRONT_LEFT',
@@ -448,9 +464,9 @@ def render_sample_data(
         'CAM_BACK',
         'CAM_BACK_RIGHT',
     ]
-    split_name = None
-    image_name = None
-    scene_name = None
+    # split_name = None
+    # image_name = None
+    # scene_name = None
 
     fig = plt.figure()
     fig.set_figheight(20)
@@ -479,7 +495,7 @@ def render_sample_data(
             # Load boxes and image.
             boxes = [Box(record['translation'], record['size'], Quaternion(record['rotation']),
                         name=record['detection_name'], token='predicted') for record in
-                    det_data['results'][sample_token] if record['detection_score'] > 0.2]
+                    det_data['results'][sample_token] if record['detection_score'] > 0.3 and record['detection_name'] in detections]
             data_path, boxes_pred, camera_intrinsic = get_predicted_data(sample_data_token,
                                                                          box_vis_level=box_vis_level, pred_anns=boxes)
             _, boxes_gt, _ = nusc.get_sample_data(sample_data_token, box_vis_level=box_vis_level)
@@ -488,24 +504,24 @@ def render_sample_data(
             # mmcv.imwrite(np.array(data)[:,:,::-1], f'{cam}.png')
             # Init axes.
 
-            if not image_name:
-                basename = os.path.basename(data_path)
-                split_name = basename.split('__')
-                scene_name = split_name[0]
-                image_name = scene_name + '_' + os.path.splitext(split_name[2])[0]
+            # if not image_name:
+            #     basename = os.path.basename(data_path)
+            #     split_name = basename.split('__')
+            #     scene_name = split_name[0]
+            #     image_name = scene_name + '_' + os.path.splitext(split_name[2])[0]
 
-                if new_scene:
-                    counter = 2
-                    while os.path.exists(os.path.join(out_path, scene_name)):
-                        scene_name = f'{split_name[0]}_{counter}'
-                        counter += 1
-                    out_path = os.path.join(out_path, scene_name)
-                    os.makedirs(out_path, exist_ok=True)
-                else:
-                    scene_folders = sorted([name for name in os.listdir(out_path) if os.path.isdir(os.path.join(out_path, name)) and scene_name in name])
-                    if len(scene_folders) > 0:
-                        scene_name = scene_folders[-1]
-                        out_path = os.path.join(out_path, scene_name)
+            #     if new_scene:
+            #         counter = 2
+            #         while os.path.exists(os.path.join(out_path, scene_name)):
+            #             scene_name = f'{split_name[0]}_{counter}'
+            #             counter += 1
+            #         out_path = os.path.join(out_path, scene_name)
+            #         os.makedirs(out_path, exist_ok=True)
+            #     else:
+            #         scene_folders = sorted([name for name in os.listdir(out_path) if os.path.isdir(os.path.join(out_path, name)) and scene_name in name])
+            #         if len(scene_folders) > 0:
+            #             scene_name = scene_folders[-1]
+            #             out_path = os.path.join(out_path, scene_name)
 
             # Show image.
             ax[ind+1].imshow(data)
@@ -528,20 +544,19 @@ def render_sample_data(
 
         ax[ind+1].axis('off')
 
-    print('Rendering sample: %s' % image_name)
-    ax[0].set_title(image_name, fontsize=24)
+    print('Rendering sample: %s' % sample_token)
+    ax[0].set_title(f'sample_token: {sample_token}', fontsize=24)
     ax[2].set_title('GT', fontsize=24, color='r', fontweight='bold')
     # ax[8].set_title('Pred', fontsize=24, fontweight='bold')
 
     plt.tight_layout()
-    out_path = os.path.join(out_path, image_name)
     # plt.savefig(out_path, bbox_inches='tight', pad_inches=0, dpi=200)
-    plt.savefig(out_path)
+    plt.savefig(os.path.join(out_path, f'{timestamp}_{sample_token}'))
     # if verbose:
     #     plt.show()
     plt.close()
     
-    return scene_name if split_name else None
+    return
 
 
 def parse_args():
@@ -578,17 +593,21 @@ def main(args, nusc):
         for scene in scenes_list:
             if i == args.amount:
                 break
-            new_scene = True
+            scene_name = scene['name']
+            print('---Scene name ' + scene_name)
+            scene_dir = os.path.join(save_dir, scene_name)
+
+            # new_scene = True
             first_sample_token = scene['first_sample_token']
             last_sample_token = scene['last_sample_token']
             if first_sample_token in sample_token_list:
+                os.makedirs(scene_dir, exist_ok=True)
                 st_index = sample_token_list.index(first_sample_token)
                 end_index = sample_token_list.index(last_sample_token)
 
-                print('---Scene token ' + scene['token'])
                 for sample_token in sample_token_list[st_index:end_index+1]:
-                    scene_name = render_sample_data(sample_token, det_data=bevformer_det_results, track_data=bevformer_track_results, out_path=save_dir, new_scene=new_scene)
-                    new_scene = False
+                    render_sample_data(sample_token, det_data=bevformer_det_results, track_data=bevformer_track_results, out_path=scene_dir)
+                    # new_scene = False
 
                 create_video(save_dir, scene_name)
                 i += 1
@@ -597,7 +616,7 @@ def main(args, nusc):
         if args.random:
             shuffle(sample_token_list)
         for sample_token in sample_token_list[:args.amount]:
-            _ = render_sample_data(sample_token, det_data=bevformer_det_results, track_data=bevformer_track_results, out_path=save_dir, new_scene=False)
+            render_sample_data(sample_token, det_data=bevformer_det_results, track_data=bevformer_track_results, out_path=save_dir)
 
 
 if __name__ == '__main__':
