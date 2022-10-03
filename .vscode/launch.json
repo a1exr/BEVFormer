@@ -8,10 +8,12 @@
             "name": "Python: BEVFormer",
             "type": "python",
             "request": "launch",
-            "args": ["--dataroot","/home/eeproj4/Alex/mmdetection3d/BEVFormer/data/nuscenes/mini","--version","v1.0-mini","--results_dir","test/bevformer_base_mini/2D_model_detTH_xz_Rdiff_customQ_mini_val"],
+            // "args": ["--dataroot","/home/eeproj4/Alex/mmdetection3d/BEVFormer/data/nuscenes/mini","--version","v1.0-mini","--results_dir","test/bevformer_base_mini/2D_model_detTH_xz_Rdiff_customQ_mini_val"],
             // "args": ["--dataroot","/home/eeproj4/Alex/mmdetection3d/BEVFormer/data/nuscenes/trainval","--version","v1.0-trainval","--results_dir","test/bevformer_base/2D_model_detTH_xz_val"],
             // "args": ["--dataroot","/home/eeproj4/Alex/mmdetection3d/BEVFormer/data/nuscenes/trainval","--version","v1.0-trainval","--results_dir","test/bevformer_base/2D_model_detTH_xz_Rdiff_customQ_val","--scene_video","--random","--seed","5","--amount","10"],
             // "args": ["--dataroot","/home/eeproj4/Alex/mmdetection3d/BEVFormer/data/nuscenes/mini","--version","v1.0-mini","--results_dir","test/bevformer_base_mini/2D_model_detTH_xz_Rdiff_customQ_mini_val","--scene_video","--random","--seed","5","--amount","10"],
+            // "args": ["--gt_dir","/home/eeproj4/Alex/AB3DMOT/data/nuScenes/nuKITTI/tracking/mini_val/label_02","--det_res_dir","/home/eeproj4/Alex/AB3DMOT/data/nuScenes/detection/BEVFormer_mini_val","--trk_res_dir","/home/eeproj4/Alex/AB3DMOT/results/nuScenes/print_P_mini_val","--results_dir","test/bevformer_base_mini/2D_model_detTH_xz_Rdiff_customQ_mini_val"],
+            "args": ["--gt_dir","/home/eeproj4/Alex/AB3DMOT/data/nuScenes/nuKITTI/tracking/val/label_02","--det_res_dir","/home/eeproj4/Alex/AB3DMOT/data/nuScenes/detection/BEVFormer_val","--trk_res_dir","/home/eeproj4/Alex/AB3DMOT/results/nuScenes/print_P_val","--results_dir","test/bevformer_base/2D_model_detTH_xz_Rdiff_customQ_val"],
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false
