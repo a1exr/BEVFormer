@@ -43,20 +43,20 @@ def plot_diff_graphs(gt_instance_df, det_instance_df, trk_instance_df, plot_path
     
     for ind, (diff_df, score_df) in enumerate(zip(diff_dfs, score_dfs)):
         diff_df.plot(y=['X', 'Y'], kind='line', ax=ax[0, ind], color=['blue', 'magenta'], linewidth=2)
-        ax[0, ind].set_title(f'Diff = GT - {res_type[ind]}', fontsize = 28)
-        ax[0, ind].set_ylabel('X,Y Diff [m]', fontsize = 24)
+        ax[0, ind].set_title(f'Error = GT - {res_type[ind]}', fontsize = 28)
+        ax[0, ind].set_ylabel('X,Y Error [m]', fontsize = 24)
         ax[0, ind].grid(True, which='both')
         ax[0, ind].tick_params(axis='both', which='major', labelsize=20)
         ax[0, ind].minorticks_on()
 
         diff_df.plot(y='Theta', kind='line', ax=ax[1, ind], color='black', linewidth=2, label='$\Theta$')
-        ax[1, ind].set_ylabel('$\Theta$ Diff [rad]', fontsize = 24)
+        ax[1, ind].set_ylabel('$\Theta$ Error [rad]', fontsize = 24)
         ax[1, ind].grid(True, which='both')
         ax[1, ind].tick_params(axis='both', which='major', labelsize=20)
         ax[1, ind].minorticks_on()
 
         diff_df.plot(y=['length', 'width'], kind='line', ax=ax[2, ind], color=['gray', 'orange'], linewidth=2)
-        ax[2, ind].set_ylabel('L,W Diff [m]', fontsize = 24)
+        ax[2, ind].set_ylabel('L,W Error [m]', fontsize = 24)
         ax[2, ind].grid(True, which='both')
         ax[2, ind].tick_params(axis='both', which='major', labelsize=20)
         ax[2, ind].minorticks_on()
@@ -76,17 +76,17 @@ def plot_diff_graphs(gt_instance_df, det_instance_df, trk_instance_df, plot_path
     ax[0, 0].plot(frames, samples*[-diag_R[0]], color='blue', linestyle='dashdot')
     ax[0, 0].plot(frames, samples*[diag_R[1]], color='magenta', linestyle='dashdot', label='$R\sigma_Y$')
     ax[0, 0].plot(frames, samples*[-diag_R[1]], color='magenta', linestyle='dashdot')
-    ax[0, 0].legend(fontsize=24)
+    ax[0, 0].legend(fontsize=24, loc='lower right')
 
     ax[1, 0].plot(frames, samples*[diag_R[2]], color='black', linestyle='dashdot', label='$R\sigma_\Theta$')
     ax[1, 0].plot(frames, samples*[-diag_R[2]], color='black', linestyle='dashdot')
-    ax[1, 0].legend(fontsize=24)
+    ax[1, 0].legend(fontsize=24, loc='lower right')
 
     ax[2, 0].plot(frames, samples*[diag_R[3]], color='gray', linestyle='dashdot', label='$R\sigma_l$')
     ax[2, 0].plot(frames, samples*[-diag_R[3]], color='gray', linestyle='dashdot')
     ax[2, 0].plot(frames, samples*[diag_R[4]], color='orange', linestyle='dashdot', label='$R\sigma_w$')
     ax[2, 0].plot(frames, samples*[-diag_R[4]], color='orange', linestyle='dashdot')
-    ax[2, 0].legend(fontsize=24)
+    ax[2, 0].legend(fontsize=24, loc='lower right')
 
     trk_instance_df.plot(y=['sig_X', 'sig_Y'], kind='line', ax=ax[0, 1], color=['blue', 'magenta'], linestyle='dashdot', label=['__','__'])
     trk_instance_df.plot(y='sig_Theta', kind='line', ax=ax[1, 1], color='black', linestyle='dashdot', label='__')
@@ -99,11 +99,18 @@ def plot_diff_graphs(gt_instance_df, det_instance_df, trk_instance_df, plot_path
     trk_instance_df.sig_w = -trk_instance_df.sig_w
 
     trk_instance_df.plot(y=['sig_X', 'sig_Y'], kind='line', ax=ax[0, 1], color=['blue', 'magenta'], linestyle='dashdot', label=['$P\sigma_X$', '$P\sigma_Y$'])
-    ax[0, 1].legend(fontsize=24)
+    ax[0, 1].legend(fontsize=24, loc='lower right')
     trk_instance_df.plot(y='sig_Theta', kind='line', ax=ax[1, 1], color='black', linestyle='dashdot', label='$P\sigma_\Theta$')
-    ax[1, 1].legend(fontsize=24)
+    ax[1, 1].legend(fontsize=24, loc='lower right')
     trk_instance_df.plot(y=['sig_l', 'sig_w'], kind='line', ax=ax[2, 1], color=['gray', 'orange'], linestyle='dashdot', label=['$P\sigma_l$', '$P\sigma_w$'])
-    ax[2, 1].legend(fontsize=24)
+    ax[2, 1].legend(fontsize=24, loc='lower right')
+
+    for i in range(4):
+        ylim_0 = ax[i, 0].get_ylim()
+        ylim_1 = ax[i, 1].get_ylim()
+        ylim = (min([ylim_0[0], ylim_1[0]]), max([ylim_0[1], ylim_1[1]]))
+        ax[i, 0].set_ylim(ylim)
+        ax[i, 1].set_ylim(ylim)
 
     plt.tight_layout()
     plt.savefig(plot_path)
@@ -176,6 +183,7 @@ def main(args):
             
             instances = cur_gt_df.ID.unique()
             for instance_ind, instance in enumerate(instances):
+                print(f'- Instance #{instance_ind} -')
                 save_dir = os.path.join(args.results_dir, 'diff_stats', str_dt, category, scene_name)
                 os.makedirs(save_dir, exist_ok=True)
                 plot_path = os.path.join(save_dir, f'{category}_{instance_ind}.png')
@@ -185,25 +193,26 @@ def main(args):
                     writer.writerow(header)
 
                     cur_instance_gt_df = cur_gt_df[cur_gt_df.ID == instance]
-                    instance_len = len(cur_instance_gt_df)
-                    if instance_len < 10: continue
+                    if len(cur_instance_gt_df) < 10: continue
 
                     if det_flag:
-                        det_instance_df = pd.DataFrame(columns=['frame', 'score', 'width', 'length', 'X', 'Y', 'Theta'], index=range(instance_len))
+                        det_instance_df = pd.DataFrame(columns=['frame', 'score', 'width', 'length', 'X', 'Y', 'Theta'], index=range(41))
                     if trk_flag:
                         trk_instance_df = pd.DataFrame(columns=['frame', 'score', 'width', 'length', 'X', 'Y', 'Theta',\
-                            'sig_X', 'sig_Y', 'sig_Theta', 'sig_l', 'sig_w'], index=range(instance_len))
+                            'sig_X', 'sig_Y', 'sig_Theta', 'sig_l', 'sig_w'], index=range(41))
                     
-                    for i, (_, cur_gt_row) in enumerate(cur_instance_gt_df.iterrows()):
+                    instance_id = None
+                    for _, cur_gt_row in cur_instance_gt_df.iterrows():
                         results_line = empty_line.copy()
                         results_line[:7] = [cur_gt_row['frame'], cur_gt_row['ID'],\
                             cur_gt_row['X'], cur_gt_row['Y'], cur_gt_row['Theta'], cur_gt_row['length'], cur_gt_row['width']]
 
+                        frame_ind = cur_gt_row.frame
                         cur_gt = cur_gt_row[['width', 'length', 'X', 'Y', 'Theta']]
 
                         # Detection
                         if det_flag:
-                            relevant_det_df = cur_det_df[cur_det_df.frame == cur_gt_row.frame]
+                            relevant_det_df = cur_det_df[cur_det_df.frame == frame_ind]
                             if not relevant_det_df.empty:
                                 cur_det = relevant_det_df[['width', 'length', 'X', 'Y', 'Theta']]
 
@@ -211,27 +220,35 @@ def main(args):
                                 diff['Theta'] = np.where(diff['Theta'].abs() > np.pi , 2*np.pi-diff['Theta'].abs(), diff['Theta'])
                                 diff_norm = diff.pow(2).sum(1).pow(0.5)
                                 min_value = diff_norm.min()
-                                if min_value < 5:
+                                if min_value < 8:
                                     cur_det_row = relevant_det_df.loc[diff_norm.idxmin()]
                                     results_line[7:13] = [cur_det_row['X'], cur_det_row['Y'], cur_det_row['Theta'],\
                                         cur_det_row['length'], cur_det_row['width'], cur_det_row['score']]
-                                    det_instance_df.loc[i] = cur_det_row.copy()
+                                    det_instance_df.loc[frame_ind] = cur_det_row.copy()
 
                         # Tracking
                         if trk_flag:
-                            relevant_trk_df = cur_trk_df[cur_trk_df.frame == cur_gt_row.frame]
-                            if not relevant_trk_df.empty:
-                                cur_trk = relevant_trk_df[['width', 'length', 'X', 'Y', 'Theta']]
-
-                                diff = -cur_trk.subtract(cur_gt, axis=1)
-                                diff['Theta'] = np.where(diff['Theta'].abs() > np.pi , 2*np.pi-diff['Theta'].abs(), diff['Theta'])
-                                diff_norm = diff.pow(2).sum(1).pow(0.5)
-                                min_value = diff_norm.min()
-                                if min_value < 5:
-                                    cur_trk_row = relevant_trk_df.loc[diff_norm.idxmin()]
+                            if instance_id is None:
+                                relevant_trk_df = cur_trk_df[cur_trk_df.frame == frame_ind]
+                                if not relevant_trk_df.empty:
+                                    cur_trk = relevant_trk_df[['width', 'length', 'X', 'Y', 'Theta']]
+                                    diff = -cur_trk.subtract(cur_gt, axis=1)
+                                    diff['Theta'] = np.where(diff['Theta'].abs() > np.pi , 2*np.pi-diff['Theta'].abs(), diff['Theta'])
+                                    diff_norm = diff.pow(2).sum(1).pow(0.5)
+                                    min_value = diff_norm.min()
+                                    if min_value < 5:
+                                        cur_trk_row = relevant_trk_df.loc[diff_norm.idxmin()]
+                                        instance_id = cur_trk_row['ID']
+                                        results_line[13:] = [cur_trk_row['X'], cur_trk_row['Y'], cur_trk_row['Theta'],\
+                                            cur_trk_row['length'], cur_trk_row['width'], cur_trk_row['score']]
+                                        trk_instance_df.loc[frame_ind] = cur_trk_row.copy()
+                            else:
+                                relevant_trk_df = cur_trk_df[(cur_trk_df.frame == frame_ind) & (cur_trk_df.ID == instance_id)]
+                                if len(relevant_trk_df) == 1:
+                                    cur_trk_row = relevant_trk_df.iloc[0]
                                     results_line[13:] = [cur_trk_row['X'], cur_trk_row['Y'], cur_trk_row['Theta'],\
                                         cur_trk_row['length'], cur_trk_row['width'], cur_trk_row['score']]
-                                    trk_instance_df.loc[i] = cur_trk_row.copy()
+                                    trk_instance_df.loc[frame_ind] = cur_trk_row.copy()
                         
                         writer.writerow(results_line)
 
@@ -240,5 +257,4 @@ def main(args):
 
 if __name__ == '__main__':
     args = parse_args()
-    # nusc = NuScenes(version=args.version, dataroot=args.dataroot, verbose=True)
     main(args)

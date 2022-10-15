@@ -302,7 +302,7 @@ def get_predicted_data(sample_data_token: str,
     return data_path, box_list, cam_intrinsic
 
 
-def lidiar_render(sample_token, det_data, track_data, out_path=None, ax=None):
+def lidar_render(nusc, sample_token, det_data, track_data, ax=None):
     bbox_gt_list = []
     bbox_det_list = []
     bbox_track_list = []
@@ -409,6 +409,7 @@ def get_color(category_name: str):
 
 
 def render_sample_data(
+        nusc: NuScenes,
         sample_token: str,
         with_anns: bool = True,
         box_vis_level: BoxVisibility = BoxVisibility.ANY,
@@ -474,7 +475,7 @@ def render_sample_data(
     ax = 7 * [None]
     
     ax[0] = plt.subplot2grid(shape=(4, 8), loc=(0, 0), colspan=4, rowspan=4)
-    lidiar_render(sample_token, det_data, track_data, out_path, ax[0])
+    lidar_render(nusc, sample_token, det_data, track_data, ax[0])
 
     ax[1] = plt.subplot2grid(shape=(4, 8), loc=(1, 4), colspan=2)
     ax[2] = plt.subplot2grid(shape=(4, 8), loc=(0, 5), colspan=2)
@@ -501,27 +502,6 @@ def render_sample_data(
             _, boxes_gt, _ = nusc.get_sample_data(sample_data_token, box_vis_level=box_vis_level)
 
             data = Image.open(data_path)
-            # mmcv.imwrite(np.array(data)[:,:,::-1], f'{cam}.png')
-            # Init axes.
-
-            # if not image_name:
-            #     basename = os.path.basename(data_path)
-            #     split_name = basename.split('__')
-            #     scene_name = split_name[0]
-            #     image_name = scene_name + '_' + os.path.splitext(split_name[2])[0]
-
-            #     if new_scene:
-            #         counter = 2
-            #         while os.path.exists(os.path.join(out_path, scene_name)):
-            #             scene_name = f'{split_name[0]}_{counter}'
-            #             counter += 1
-            #         out_path = os.path.join(out_path, scene_name)
-            #         os.makedirs(out_path, exist_ok=True)
-            #     else:
-            #         scene_folders = sorted([name for name in os.listdir(out_path) if os.path.isdir(os.path.join(out_path, name)) and scene_name in name])
-            #         if len(scene_folders) > 0:
-            #             scene_name = scene_folders[-1]
-            #             out_path = os.path.join(out_path, scene_name)
 
             # Show image.
             ax[ind+1].imshow(data)
@@ -531,9 +511,6 @@ def render_sample_data(
                 for box in boxes_gt:
                     c = np.array(get_color(box.name)) / 255.0
                     box.render(ax[ind+1], view=camera_intrinsic, normalize=True, colors=(c, c, c))
-                # for box in boxes_pred:
-                #     c = np.array(get_color(box.name)) / 255.0
-                #     box.render(ax[ind+7], view=camera_intrinsic, normalize=True, colors=(c, c, c))
 
             # Limit visible range.
             ax[ind+1].set_xlim(0, data.size[0])
@@ -550,7 +527,6 @@ def render_sample_data(
     # ax[8].set_title('Pred', fontsize=24, fontweight='bold')
 
     plt.tight_layout()
-    # plt.savefig(out_path, bbox_inches='tight', pad_inches=0, dpi=200)
     plt.savefig(os.path.join(out_path, f'{timestamp}_{sample_token}'))
     # if verbose:
     #     plt.show()
@@ -606,7 +582,7 @@ def main(args, nusc):
                 end_index = sample_token_list.index(last_sample_token)
 
                 for sample_token in sample_token_list[st_index:end_index+1]:
-                    render_sample_data(sample_token, det_data=bevformer_det_results, track_data=bevformer_track_results, out_path=scene_dir)
+                    render_sample_data(nusc, sample_token, det_data=bevformer_det_results, track_data=bevformer_track_results, out_path=scene_dir)
                     # new_scene = False
 
                 create_video(save_dir, scene_name)
@@ -616,7 +592,7 @@ def main(args, nusc):
         if args.random:
             shuffle(sample_token_list)
         for sample_token in sample_token_list[:args.amount]:
-            render_sample_data(sample_token, det_data=bevformer_det_results, track_data=bevformer_track_results, out_path=save_dir)
+            render_sample_data(nusc, sample_token, det_data=bevformer_det_results, track_data=bevformer_track_results, out_path=save_dir)
 
 
 if __name__ == '__main__':
