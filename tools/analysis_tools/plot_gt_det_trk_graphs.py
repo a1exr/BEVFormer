@@ -68,41 +68,58 @@ def plot_diff_graphs(gt_instance_df, det_instance_df, trk_instance_df, plot_path
         ax[3, ind].tick_params(axis='both', which='major', labelsize=20)
         ax[3, ind].minorticks_on()
 
-    diag_R = np.sqrt(np.diag(R_matrix))
-    samples = len(score_df)
-    frames = range(samples)
+    # diag_R = np.sqrt(np.diag(R_matrix))
+    # samples = len(score_df)
+    # frames = range(samples)
 
-    ax[0, 0].plot(frames, samples*[diag_R[0]], color='blue', linestyle='dashdot', label='$R\sigma_X$')
-    ax[0, 0].plot(frames, samples*[-diag_R[0]], color='blue', linestyle='dashdot')
-    ax[0, 0].plot(frames, samples*[diag_R[1]], color='magenta', linestyle='dashdot', label='$R\sigma_Y$')
-    ax[0, 0].plot(frames, samples*[-diag_R[1]], color='magenta', linestyle='dashdot')
+    # ax[0, 0].plot(frames, samples*[diag_R[0]], color='blue', linestyle='dashdot', label='$R\sigma_X$')
+    # ax[0, 0].plot(frames, samples*[-diag_R[0]], color='blue', linestyle='dashdot')
+    # ax[0, 0].plot(frames, samples*[diag_R[1]], color='magenta', linestyle='dashdot', label='$R\sigma_Y$')
+    # ax[0, 0].plot(frames, samples*[-diag_R[1]], color='magenta', linestyle='dashdot')
+    # ax[0, 0].legend(fontsize=24, loc='lower right')
+
+    # ax[1, 0].plot(frames, samples*[diag_R[2]], color='black', linestyle='dashdot', label='$R\sigma_\Theta$')
+    # ax[1, 0].plot(frames, samples*[-diag_R[2]], color='black', linestyle='dashdot')
+    # ax[1, 0].legend(fontsize=24, loc='lower right')
+
+    # ax[2, 0].plot(frames, samples*[diag_R[3]], color='gray', linestyle='dashdot', label='$R\sigma_l$')
+    # ax[2, 0].plot(frames, samples*[-diag_R[3]], color='gray', linestyle='dashdot')
+    # ax[2, 0].plot(frames, samples*[diag_R[4]], color='orange', linestyle='dashdot', label='$R\sigma_w$')
+    # ax[2, 0].plot(frames, samples*[-diag_R[4]], color='orange', linestyle='dashdot')
+    # ax[2, 0].legend(fontsize=24, loc='lower right')
+
+    trk_instance_df.plot(y=['sig_R_X', 'sig_R_Y'], kind='line', ax=ax[0, 0], color=['blue', 'magenta'], linestyle='dashdot', label=['__','__'])
+    trk_instance_df.plot(y='sig_R_Theta', kind='line', ax=ax[1, 0], color='black', linestyle='dashdot', label='__')
+    trk_instance_df.plot(y=['sig_R_l', 'sig_R_w'], kind='line', ax=ax[2, 0], color=['gray', 'orange'], linestyle='dashdot', label=['__','__'])
+
+    trk_instance_df.sig_R_X = -trk_instance_df.sig_R_X
+    trk_instance_df.sig_R_Y = -trk_instance_df.sig_R_Y
+    trk_instance_df.sig_R_Theta = -trk_instance_df.sig_R_Theta
+    trk_instance_df.sig_R_l = -trk_instance_df.sig_R_l
+    trk_instance_df.sig_R_w = -trk_instance_df.sig_R_w
+
+    trk_instance_df.plot(y=['sig_R_X', 'sig_R_Y'], kind='line', ax=ax[0, 0], color=['blue', 'magenta'], linestyle='dashdot', label=['$R\sigma_X$', '$R\sigma_Y$'])
     ax[0, 0].legend(fontsize=24, loc='lower right')
-
-    ax[1, 0].plot(frames, samples*[diag_R[2]], color='black', linestyle='dashdot', label='$R\sigma_\Theta$')
-    ax[1, 0].plot(frames, samples*[-diag_R[2]], color='black', linestyle='dashdot')
+    trk_instance_df.plot(y='sig_R_Theta', kind='line', ax=ax[1, 0], color='black', linestyle='dashdot', label='$R\sigma_\Theta$')
     ax[1, 0].legend(fontsize=24, loc='lower right')
-
-    ax[2, 0].plot(frames, samples*[diag_R[3]], color='gray', linestyle='dashdot', label='$R\sigma_l$')
-    ax[2, 0].plot(frames, samples*[-diag_R[3]], color='gray', linestyle='dashdot')
-    ax[2, 0].plot(frames, samples*[diag_R[4]], color='orange', linestyle='dashdot', label='$R\sigma_w$')
-    ax[2, 0].plot(frames, samples*[-diag_R[4]], color='orange', linestyle='dashdot')
+    trk_instance_df.plot(y=['sig_R_l', 'sig_R_w'], kind='line', ax=ax[2, 0], color=['gray', 'orange'], linestyle='dashdot', label=['$R\sigma_l$', '$R\sigma_w$'])
     ax[2, 0].legend(fontsize=24, loc='lower right')
 
-    trk_instance_df.plot(y=['sig_X', 'sig_Y'], kind='line', ax=ax[0, 1], color=['blue', 'magenta'], linestyle='dashdot', label=['__','__'])
-    trk_instance_df.plot(y='sig_Theta', kind='line', ax=ax[1, 1], color='black', linestyle='dashdot', label='__')
-    trk_instance_df.plot(y=['sig_l', 'sig_w'], kind='line', ax=ax[2, 1], color=['gray', 'orange'], linestyle='dashdot', label=['__','__'])
+    trk_instance_df.plot(y=['sig_P_X', 'sig_P_Y'], kind='line', ax=ax[0, 1], color=['blue', 'magenta'], linestyle='dashdot', label=['__','__'])
+    trk_instance_df.plot(y='sig_P_Theta', kind='line', ax=ax[1, 1], color='black', linestyle='dashdot', label='__')
+    trk_instance_df.plot(y=['sig_P_l', 'sig_P_w'], kind='line', ax=ax[2, 1], color=['gray', 'orange'], linestyle='dashdot', label=['__','__'])
 
-    trk_instance_df.sig_X = -trk_instance_df.sig_X
-    trk_instance_df.sig_Y = -trk_instance_df.sig_Y
-    trk_instance_df.sig_Theta = -trk_instance_df.sig_Theta
-    trk_instance_df.sig_l = -trk_instance_df.sig_l
-    trk_instance_df.sig_w = -trk_instance_df.sig_w
+    trk_instance_df.sig_P_X = -trk_instance_df.sig_P_X
+    trk_instance_df.sig_P_Y = -trk_instance_df.sig_P_Y
+    trk_instance_df.sig_P_Theta = -trk_instance_df.sig_P_Theta
+    trk_instance_df.sig_P_l = -trk_instance_df.sig_P_l
+    trk_instance_df.sig_P_w = -trk_instance_df.sig_P_w
 
-    trk_instance_df.plot(y=['sig_X', 'sig_Y'], kind='line', ax=ax[0, 1], color=['blue', 'magenta'], linestyle='dashdot', label=['$P\sigma_X$', '$P\sigma_Y$'])
+    trk_instance_df.plot(y=['sig_P_X', 'sig_P_Y'], kind='line', ax=ax[0, 1], color=['blue', 'magenta'], linestyle='dashdot', label=['$P\sigma_X$', '$P\sigma_Y$'])
     ax[0, 1].legend(fontsize=24, loc='lower right')
-    trk_instance_df.plot(y='sig_Theta', kind='line', ax=ax[1, 1], color='black', linestyle='dashdot', label='$P\sigma_\Theta$')
+    trk_instance_df.plot(y='sig_P_Theta', kind='line', ax=ax[1, 1], color='black', linestyle='dashdot', label='$P\sigma_\Theta$')
     ax[1, 1].legend(fontsize=24, loc='lower right')
-    trk_instance_df.plot(y=['sig_l', 'sig_w'], kind='line', ax=ax[2, 1], color=['gray', 'orange'], linestyle='dashdot', label=['$P\sigma_l$', '$P\sigma_w$'])
+    trk_instance_df.plot(y=['sig_P_l', 'sig_P_w'], kind='line', ax=ax[2, 1], color=['gray', 'orange'], linestyle='dashdot', label=['$P\sigma_l$', '$P\sigma_w$'])
     ax[2, 1].legend(fontsize=24, loc='lower right')
 
     for i in range(4):
@@ -176,9 +193,10 @@ def main(args):
             if not os.path.isfile(trk_folder_path): trk_flag = False
 
             if trk_flag:
-                cur_trk_df = pd.read_csv(trk_folder_path, sep=' ', header=None, usecols=[0,1,3,4,5,6,7,8,9,10,11,12,13],\
+                cur_trk_df = pd.read_csv(trk_folder_path, sep=' ', header=None, usecols=[0,1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18],\
                     names=['frame', 'ID', 'score', 'width', 'length', 'X', 'Y', 'Theta',\
-                        'sig_X', 'sig_Y', 'sig_Theta', 'sig_l', 'sig_w'])
+                        'sig_P_X', 'sig_P_Y', 'sig_P_Theta', 'sig_P_l', 'sig_P_w',
+                        'sig_R_X', 'sig_R_Y', 'sig_R_Theta', 'sig_R_l', 'sig_R_w'])
                 # cur_trk_df = cur_trk_df[cur_trk_df.score >= 0.4]
             
             instances = cur_gt_df.ID.unique()
@@ -196,10 +214,11 @@ def main(args):
                     if len(cur_instance_gt_df) < 10: continue
 
                     if det_flag:
-                        det_instance_df = pd.DataFrame(columns=['frame', 'score', 'width', 'length', 'X', 'Y', 'Theta'], index=range(41))
+                        det_instance_df = pd.DataFrame(columns=['frame', 'score', 'width', 'length', 'X', 'Y', 'Theta',], index=range(41))
                     if trk_flag:
                         trk_instance_df = pd.DataFrame(columns=['frame', 'score', 'width', 'length', 'X', 'Y', 'Theta',\
-                            'sig_X', 'sig_Y', 'sig_Theta', 'sig_l', 'sig_w'], index=range(41))
+                            'sig_P_X', 'sig_P_Y', 'sig_P_Theta', 'sig_P_l', 'sig_P_w',\
+                                'sig_R_X', 'sig_R_Y', 'sig_R_Theta', 'sig_R_l', 'sig_R_w'], index=range(41))
                     
                     instance_id = None
                     for _, cur_gt_row in cur_instance_gt_df.iterrows():

@@ -48,6 +48,10 @@ detections = ['car',
  'trailer',
  'truck']
 
+custom_val = \
+    ['scene-0003', 'scene-0092', 'scene-0272', 'scene-0521', 'scene-0771', 'scene-0796', 'scene-0914', 'scene-0924',
+    'scene-0968', 'scene-1063']
+
 import numpy as np
 import matplotlib.pyplot as plt
 from nuscenes.utils.data_classes import LidarPointCloud, RadarPointCloud, Box
@@ -540,10 +544,11 @@ def parse_args():
     parser.add_argument('--dataroot', type=str, default='./data/nuscenes/trainval')
     parser.add_argument('--version', type=str, default='v1.0-trainval', choices=['v1.0-trainval', 'v1.0-mini'])
     parser.add_argument('--results_dir', help='the dir where the results jsons are')
-    parser.add_argument('--amount', type=int, default=10, help='number of samples / scenes')
+    parser.add_argument('--amount', type=int, default=30, help='number of samples / scenes')
     parser.add_argument('--scene_video', action='store_true', help='visualize entire scene')
     parser.add_argument('--random', action='store_true', help='pick samples randomly')
     parser.add_argument('--seed', type=int, default=0, help='random seed')
+    parser.add_argument('--custom_val', action='store_true', help='custom scenes list')
     args = parser.parse_args()
 
     return args
@@ -570,6 +575,7 @@ def main(args, nusc):
             if i == args.amount:
                 break
             scene_name = scene['name']
+            if args.custom_val and scene_name not in custom_val: continue
             print('---Scene name ' + scene_name)
             scene_dir = os.path.join(save_dir, scene_name)
 
