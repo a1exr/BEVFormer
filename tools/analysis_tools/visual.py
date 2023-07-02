@@ -48,9 +48,11 @@ detections = ['car',
  'trailer',
  'truck']
 
-custom_val = \
+custom_val_list_copy = \
     ['scene-0003', 'scene-0092', 'scene-0272', 'scene-0521', 'scene-0771', 'scene-0796', 'scene-0914', 'scene-0924',
     'scene-0968', 'scene-1063']
+mini_val_list_copy = ['scene-1063']
+    # ['scene-0924', 'scene-1063']
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -306,10 +308,12 @@ def get_predicted_data(sample_data_token: str,
     return data_path, box_list, cam_intrinsic
 
 
-def lidar_render(nusc, sample_token, det_data, track_data, ax=None):
+def lidar_render(nusc, sample_token, det_data, track_data, track_data_2, ax=None):
+# def lidar_render(nusc, sample_token, det_data, track_data, ax=None):
     bbox_gt_list = []
     bbox_det_list = []
     bbox_track_list = []
+    bbox_track_2_list = []
     # GT
     anns = nusc.get('sample', sample_token)['anns']
     for ann in anns:
@@ -326,6 +330,7 @@ def lidar_render(nusc, sample_token, det_data, track_data, ax=None):
                     ego_translation=(0.0, 0.0, 0.0) if 'ego_translation' not in content
                     else tuple(content['ego_translation']),
                     num_pts=-1 if 'num_pts' not in content else int(content['num_pts']),
+                    id=-1,
                     detection_name=category_name,
                     detection_score=-1.0 if 'detection_score' not in content else float(content['detection_score']),
                     attribute_name=''))
@@ -337,7 +342,7 @@ def lidar_render(nusc, sample_token, det_data, track_data, ax=None):
     for content in bbox_anns:
         category_name = content['detection_name']
         detection_score = -1.0 if 'detection_score' not in content else float(content['detection_score'])
-        if category_name in detections and detection_score > 0.3:
+        if category_name in detections and detection_score >= 0: # 0.005: # 0.3
             bbox_det_list.append(DetectionBox(
                 sample_token=content['sample_token'],
                 translation=tuple(content['translation']),
@@ -347,6 +352,7 @@ def lidar_render(nusc, sample_token, det_data, track_data, ax=None):
                 ego_translation=(0.0, 0.0, 0.0) if 'ego_translation' not in content
                 else tuple(content['ego_translation']),
                 num_pts=-1 if 'num_pts' not in content else int(content['num_pts']),
+                id=-1,
                 detection_name=category_name,
                 detection_score=detection_score,
                 attribute_name=content['attribute_name']))
@@ -355,7 +361,7 @@ def lidar_render(nusc, sample_token, det_data, track_data, ax=None):
     bbox_anns = track_data['results'][sample_token]
     for content in bbox_anns:
         tracking_score = -1.0 if 'tracking_score' not in content else float(content['tracking_score'])
-        if tracking_score > 0.4:
+        if tracking_score >= 0:   # 0.4
             bbox_track_list.append(DetectionBox(
                 sample_token=content['sample_token'],
                 translation=tuple(content['translation']),
@@ -365,20 +371,42 @@ def lidar_render(nusc, sample_token, det_data, track_data, ax=None):
                 ego_translation=(0.0, 0.0, 0.0) if 'ego_translation' not in content
                 else tuple(content['ego_translation']),
                 num_pts=-1 if 'num_pts' not in content else int(content['num_pts']),
+                id=content['tracking_id'],
                 detection_name=content['tracking_name'],
-                detection_score=tracking_score,
-                attribute_name=content['attribute_name']))
+                detection_score=tracking_score))
+                # attribute_name=content['attribute_name']))
+
+    if track_data_2:
+        bbox_anns = track_data_2['results'][sample_token]
+        for content in bbox_anns:
+            tracking_score = -1.0 if 'tracking_score' not in content else float(content['tracking_score'])
+            if tracking_score >= 0:   # 0.4
+                bbox_track_2_list.append(DetectionBox(
+                    sample_token=content['sample_token'],
+                    translation=tuple(content['translation']),
+                    size=tuple(content['size']),
+                    rotation=tuple(content['rotation']),
+                    velocity=tuple(content['velocity']),
+                    ego_translation=(0.0, 0.0, 0.0) if 'ego_translation' not in content
+                    else tuple(content['ego_translation']),
+                    num_pts=-1 if 'num_pts' not in content else int(content['num_pts']),
+                    detection_name=content['tracking_name'],
+                    detection_score=tracking_score))
+                    # attribute_name=content['attribute_name']))
 
     gt_annotations = EvalBoxes()
     det_pred_annotations = EvalBoxes()
     track_pred_annotations = EvalBoxes()
+    track_2_pred_annotations = EvalBoxes()
     gt_annotations.add_boxes(sample_token, bbox_gt_list)
     det_pred_annotations.add_boxes(sample_token, bbox_det_list)
     track_pred_annotations.add_boxes(sample_token, bbox_track_list)
+    track_2_pred_annotations.add_boxes(sample_token, bbox_track_2_list)
     # print('green is ground truth')
     # print('blue is the predited result')
     # visualize_sample(nusc, sample_token, gt_annotations, pred_annotations, savepath=out_path + '_bev')
-    visualize_sample(nusc, sample_token, gt_annotations, det_pred_annotations, track_pred_annotations, ax)
+    visualize_sample(nusc, sample_token, gt_annotations, det_pred_annotations, track_pred_annotations, track_2_pred_annotations, ax)
+    # visualize_sample(nusc, sample_token, gt_annotations, det_pred_annotations, track_pred_annotations, ax)
 
 
 def get_color(category_name: str):
@@ -414,6 +442,7 @@ def get_color(category_name: str):
 
 def render_sample_data(
         nusc: NuScenes,
+        i: int,
         sample_token: str,
         with_anns: bool = True,
         box_vis_level: BoxVisibility = BoxVisibility.ANY,
@@ -431,6 +460,7 @@ def render_sample_data(
         show_panoptic: bool = False,
         det_data=None,
         track_data=None,
+        track_data_2=None,
       ) -> None:
     """
     Render sample data onto axis.
@@ -479,7 +509,8 @@ def render_sample_data(
     ax = 7 * [None]
     
     ax[0] = plt.subplot2grid(shape=(4, 8), loc=(0, 0), colspan=4, rowspan=4)
-    lidar_render(nusc, sample_token, det_data, track_data, ax[0])
+    lidar_render(nusc, sample_token, det_data, track_data, track_data_2, ax[0])
+    # lidar_render(nusc, sample_token, det_data, track_data, ax[0])
 
     ax[1] = plt.subplot2grid(shape=(4, 8), loc=(1, 4), colspan=2)
     ax[2] = plt.subplot2grid(shape=(4, 8), loc=(0, 5), colspan=2)
@@ -526,8 +557,9 @@ def render_sample_data(
         ax[ind+1].axis('off')
 
     print('Rendering sample: %s' % sample_token)
-    ax[0].set_title(f'sample_token: {sample_token}', fontsize=24)
-    ax[2].set_title('GT', fontsize=24, color='r', fontweight='bold')
+    ax[0].set_title(f'frame #{i}', fontsize=24)
+    ax[2].set_title(f'sample_token: {sample_token}', fontsize=24)
+    # ax[2].set_title('GT', fontsize=24, color='r', fontweight='bold')
     # ax[8].set_title('Pred', fontsize=24, fontweight='bold')
 
     plt.tight_layout()
@@ -544,6 +576,7 @@ def parse_args():
     parser.add_argument('--dataroot', type=str, default='./data/nuscenes/trainval')
     parser.add_argument('--version', type=str, default='v1.0-trainval', choices=['v1.0-trainval', 'v1.0-mini'])
     parser.add_argument('--results_dir', help='the dir where the results jsons are')
+    parser.add_argument('--results_dir_2', help='the dir where the results jsons are', required=False, default='')
     parser.add_argument('--amount', type=int, default=30, help='number of samples / scenes')
     parser.add_argument('--scene_video', action='store_true', help='visualize entire scene')
     parser.add_argument('--random', action='store_true', help='pick samples randomly')
@@ -560,11 +593,14 @@ def main(args, nusc):
     extension = '_rand' if args.random else ''
     str_dt = dt.strftime("%d-%m-%Y_%H:%M:%S") + extension
     save_dir = os.path.join(args.results_dir, 'plots', str_dt)
-    os.makedirs(save_dir, exist_ok=True)
 
-    bevformer_det_results = mmcv.load(os.path.join(args.results_dir, 'detect_results_nusc.json'))
-    bevformer_track_results = mmcv.load(os.path.join(args.results_dir, 'track_results_nusc.json'))
-    sample_token_list = list(bevformer_det_results['results'].keys())
+    det_results = mmcv.load(os.path.join(args.results_dir, 'detect_results_nusc.json'))
+    track_results = mmcv.load(os.path.join(args.results_dir, 'track_results_nusc.json'))
+    if len(args.results_dir_2) > 0:
+        nms_track_results = mmcv.load(os.path.join(args.results_dir_2, 'track_results_nusc.json'))
+        save_dir = os.path.join(args.results_dir_2, 'plots', str_dt)
+    sample_token_list = list(det_results['results'].keys())
+    os.makedirs(save_dir, exist_ok=True)
 
     if args.scene_video:
         i = 0
@@ -575,7 +611,8 @@ def main(args, nusc):
             if i == args.amount:
                 break
             scene_name = scene['name']
-            if args.custom_val and scene_name not in custom_val: continue
+            if args.custom_val and scene_name not in custom_val_list_copy: continue
+            # if args.custom_val and scene_name not in mini_val_list_copy: continue
             print('---Scene name ' + scene_name)
             scene_dir = os.path.join(save_dir, scene_name)
 
@@ -587,8 +624,11 @@ def main(args, nusc):
                 st_index = sample_token_list.index(first_sample_token)
                 end_index = sample_token_list.index(last_sample_token)
 
-                for sample_token in sample_token_list[st_index:end_index+1]:
-                    render_sample_data(nusc, sample_token, det_data=bevformer_det_results, track_data=bevformer_track_results, out_path=scene_dir)
+                for i, sample_token in enumerate(sample_token_list[st_index:end_index+1]):
+                    if len(args.results_dir_2) > 0:
+                        render_sample_data(nusc, i, sample_token, det_data=det_results, track_data=track_results, track_data_2=nms_track_results, out_path=scene_dir)
+                    else:
+                        render_sample_data(nusc, i, sample_token, det_data=det_results, track_data=track_results, out_path=scene_dir)
                     # new_scene = False
 
                 create_video(save_dir, scene_name)
@@ -597,8 +637,8 @@ def main(args, nusc):
     else:
         if args.random:
             shuffle(sample_token_list)
-        for sample_token in sample_token_list[:args.amount]:
-            render_sample_data(nusc, sample_token, det_data=bevformer_det_results, track_data=bevformer_track_results, out_path=save_dir)
+        for i, sample_token in enumerate(sample_token_list[:args.amount]):
+            render_sample_data(nusc, i, sample_token, det_data=det_results, track_data=track_results, track_data_2=nms_track_results, out_path=save_dir)
 
 
 if __name__ == '__main__':
